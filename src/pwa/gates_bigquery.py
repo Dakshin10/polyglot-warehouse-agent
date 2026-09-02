@@ -11,7 +11,7 @@ import logging
 from dotenv import load_dotenv
 from google.cloud import bigquery
 from sqlalchemy import text
-from pwa.db import get_pg_engine
+from pwa.connections import get_pg_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("verify_bq")

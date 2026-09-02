@@ -4,7 +4,7 @@ import logging
 from dotenv import load_dotenv
 import pandas as pd
 from google.cloud import bigquery
-from pwa.db import get_mysql_engine
+from pwa.connections import get_mysql_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("replicate_mysql")

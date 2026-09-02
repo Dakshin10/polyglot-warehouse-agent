@@ -1,9 +1,11 @@
 import sys
 import argparse
-from pwa.logging import setup_logging, RedactingFilter
-from pwa.config import get_settings
-from pwa.pipelines import run_source_pipeline, run_warehouse_pipeline
-from pwa.gates import run_source_gates, run_warehouse_gates
+from pwa.logging_setup import setup_logging, RedactingFilter
+from pwa.settings import get_settings
+from pwa.run_source import run_source_pipeline
+from pwa.run_bigquery import run_warehouse_pipeline
+from pwa.gates_source import run_all_gates as run_source_gates
+from pwa.gates_bigquery import run_all_bq_gates as run_warehouse_gates
 
 
 def cmd_config_check():

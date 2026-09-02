@@ -1,5 +1,5 @@
 import pytest
-from pwa.config import Settings
+from pwa.settings import Settings
 
 
 def test_config_missing_required(monkeypatch, tmp_path):

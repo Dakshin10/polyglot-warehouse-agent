@@ -3,7 +3,8 @@ import sys
 import logging
 from dotenv import load_dotenv
 from google.cloud import bigquery
-from pwa.warehouse.setup import authorize_mart_views
+from pwa.bigquery_setup import authorize_mart_views
+from pwa.sql_files import read_sql_file, sql_file_path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("build_mart")
@@ -38,23 +39,13 @@ def _split_sql_statements(sql_text):
     return statements
 
 
-def _execute_sql_file(client, sql_path, project, label):
-    """Read a SQL file, replace {PROJECT}, and execute each statement."""
-    filename = os.path.basename(sql_path)
-    raw_sql = None
+def _execute_sql_file(client, filename, project, label):
+    """Read a SQL file from the repository `sql/` directory, replace {PROJECT}, and execute each statement."""
+    sql_path = sql_file_path(filename)
     try:
-        from importlib.resources import files
-
-        raw_sql = files("pwa.sql.mart").joinpath(filename).read_text(encoding="utf-8")
-    except Exception:
-        if not os.path.exists(sql_path):
-            sql_path = os.path.join(".", "src", "pwa", "sql", "mart", filename)
-        if os.path.exists(sql_path):
-            with open(sql_path, "r", encoding="utf-8") as f:
-                raw_sql = f.read()
-
-    if raw_sql is None:
-        logger.error(f"{label}: SQL file '{filename}' not found.")
+        raw_sql = read_sql_file(filename)
+    except OSError as e:
+        logger.error(f"{label}: SQL file '{filename}' not found ({e}).")
         sys.exit(1)
 
     sql = raw_sql.replace("{PROJECT}", project)
@@ -98,15 +89,8 @@ def build_mart():
 
     logger.info("=== STEP 3: BUILD MART LAYER ===")
 
-    mart_sql_path = os.path.join(".", "src", "pwa", "sql", "mart", "views.sql")
-    if not os.path.exists(mart_sql_path):
-        mart_sql_path = os.path.join(".", "sql", "bq_mart.sql")
-    mart_ok = _execute_sql_file(client, mart_sql_path, project, "MART VIEWS")
-
-    desc_sql_path = os.path.join(".", "src", "pwa", "sql", "mart", "descriptions.sql")
-    if not os.path.exists(desc_sql_path):
-        desc_sql_path = os.path.join(".", "sql", "bq_descriptions.sql")
-    desc_ok = _execute_sql_file(client, desc_sql_path, project, "MART DESCRIPTIONS")
+    mart_ok = _execute_sql_file(client, "mart_views.sql", project, "MART VIEWS")
+    desc_ok = _execute_sql_file(client, "mart_descriptions.sql", project, "MART DESCRIPTIONS")
 
     if not mart_ok or not desc_ok:
         logger.error("Mart layer build had errors. See logs above.")

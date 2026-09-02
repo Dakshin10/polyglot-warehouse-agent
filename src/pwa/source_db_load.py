@@ -2,7 +2,8 @@ import os
 import logging
 from dotenv import load_dotenv
 from sqlalchemy import text, types
-from pwa.db import get_mysql_engine, get_pg_engine
+from pwa.connections import get_mysql_engine, get_pg_engine
+from pwa.sql_files import read_sql_file
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("load")
@@ -13,7 +14,7 @@ def load_data(mysql_df=None, pg_df=None):
     load_dotenv()
 
     if mysql_df is None or pg_df is None:
-        from pwa.transform import transform_and_select
+        from pwa.movie_transform import transform_and_select
 
         mysql_df, pg_df = transform_and_select()
 
@@ -23,16 +24,7 @@ def load_data(mysql_df=None, pg_df=None):
     pg_engine, pg_type = get_pg_engine()
 
     # 1. Execute MySQL DDL
-    try:
-        from importlib.resources import files
-
-        mysql_sql = files("pwa.sql.ddl").joinpath("mysql_movie.sql").read_text(encoding="utf-8")
-    except Exception:
-        mysql_ddl_path = os.path.join(".", "sql", "mysql_schema.sql")
-        if not os.path.exists(mysql_ddl_path):
-            mysql_ddl_path = os.path.join(".", "src", "pwa", "sql", "ddl", "mysql_movie.sql")
-        with open(mysql_ddl_path, "r", encoding="utf-8") as f:
-            mysql_sql = f.read()
+    mysql_sql = read_sql_file("mysql_movie_ddl.sql")
 
     logger.info(f"Executing MySQL DDL script on {mysql_type.upper()} engine...")
     with mysql_engine.connect() as conn:
@@ -85,16 +77,7 @@ def load_data(mysql_df=None, pg_df=None):
         logger.info(f"{mysql_type.upper()} DB reported row count for `movie`: {res}")
 
     # 2. Execute Postgres DDL
-    try:
-        from importlib.resources import files
-
-        pg_sql = files("pwa.sql.ddl").joinpath("postgres_movie_credits.sql").read_text(encoding="utf-8")
-    except Exception:
-        pg_ddl_path = os.path.join(".", "sql", "postgres_schema.sql")
-        if not os.path.exists(pg_ddl_path):
-            pg_ddl_path = os.path.join(".", "src", "pwa", "sql", "ddl", "postgres_movie_credits.sql")
-        with open(pg_ddl_path, "r", encoding="utf-8") as f:
-            pg_sql = f.read()
+    pg_sql = read_sql_file("postgres_credits_ddl.sql")
 
     logger.info(f"Executing PostgreSQL DDL script on {pg_type.upper()} engine...")
     with pg_engine.connect() as conn:

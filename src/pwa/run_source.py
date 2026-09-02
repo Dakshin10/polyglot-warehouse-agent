@@ -1,8 +1,8 @@
 import logging
-from pwa.ingest import download_dataset
-from pwa.transform import transform_and_select
-from pwa.load import load_data
-from pwa.gates import run_source_gates
+from pwa.kaggle_download import download_dataset
+from pwa.movie_transform import transform_and_select
+from pwa.source_db_load import load_data
+from pwa.gates_source import run_all_gates as run_source_gates
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("pipeline")

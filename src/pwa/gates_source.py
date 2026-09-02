@@ -3,7 +3,7 @@ import sys
 import logging
 from dotenv import load_dotenv
 import pandas as pd
-from pwa.db import get_mysql_engine, get_pg_engine
+from pwa.connections import get_mysql_engine, get_pg_engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("verify")

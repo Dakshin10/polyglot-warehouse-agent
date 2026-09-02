@@ -1,7 +1,9 @@
 import logging
-from pwa.warehouse import run_setup, build_mart
-from pwa.ingest import replicate_mysql, load_csvs
-from pwa.gates import run_warehouse_gates
+from pwa.bigquery_setup import run_setup
+from pwa.bigquery_mart import build_mart
+from pwa.bigquery_replicate import replicate_mysql
+from pwa.bigquery_load_csv import load_csvs
+from pwa.gates_bigquery import run_all_bq_gates as run_warehouse_gates
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("bq_pipeline")
