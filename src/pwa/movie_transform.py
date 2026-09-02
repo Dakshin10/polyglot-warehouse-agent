@@ -3,8 +3,7 @@ import os
 import logging
 import pandas as pd
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("transform")
+logger = logging.getLogger("pwa.movie_transform")
 
 swallowed_exceptions_count = 0
 

@@ -10,7 +10,7 @@ This runbook documents every known failure mode, root cause, and exact remedy fo
 - **Symptom**: BigQuery `EXTERNAL_QUERY` throws `Dataset not found` or `Table not found` during connection or federated query execution.
 - **Root Cause**: The BigQuery dataset (`BQ_LOCATION`), the BigQuery Connection, and the Cloud SQL PostgreSQL instance belong to different region families (e.g., dataset in `US` while Cloud SQL is in `europe-west1`).
 - **Diagnosis**: Compare `gcloud sql instances describe <instance>` region against `BQ_LOCATION`.
-- **Remedy**: Ensure `BQ_LOCATION` is set to `EU` when Cloud SQL is in `europe-west1` (or `US` when in `us-*`). `pwa config check` automatically validates region compatibility.
+- **Remedy**: Ensure `BQ_LOCATION` is set to `EU` when Cloud SQL is in `europe-west1` (or `US` when in `us-*`). `pwa config` automatically validates region compatibility.
 
 ---
 
@@ -52,3 +52,32 @@ This runbook documents every known failure mode, root cause, and exact remedy fo
 - **Symptom**: `400 Syntax error: Unclosed string literal` when executing `descriptions.sql`.
 - **Root Cause**: Simple string splitting (`sql.split(";")`) breaks when descriptions contain embedded semicolons inside single quotes (e.g. `'... changes over time; higher is more popular'`).
 - **Remedy**: `_split_sql_statements()` in `pwa.warehouse.mart` uses a quote-aware parser that ignores semicolons inside single quotes `'...'`.
+
+## `pwa config` fails with "MYSQL_SSL_CA does not exist on disk"
+
+- **Cause**: `certs/ca.pem` is missing. `certs/` is gitignored, so a fresh
+  clone never has it.
+- **Remedy**: Aiven console → your MySQL service → Overview → download the CA
+  certificate, and save it as `certs/ca.pem`.
+- **Why this blocks everything**: without the CA the driver cannot verify the
+  server's identity. The connection would still be encrypted, which is exactly
+  why this used to pass unnoticed — encryption without verification looks
+  identical in the logs. Validation now refuses to start rather than
+  downgrading silently, and there is no flag to skip it.
+
+## `pwa audit` reports "agent service account read path unverified"
+
+- **Cause**: `iamcredentials.googleapis.com` is disabled on the project, so the
+  audit cannot impersonate `warehouse-agent@<project>.iam.gserviceaccount.com`
+  to prove that the agent — and only the agent's own permissions — can read
+  `mart.v_movie_full`.
+- **Remedy**: enable the IAM Service Account Credentials API on the project,
+  then re-run `pwa audit`.
+- **Note**: gate B11 does *not* cover this. B11 asserts the mart view is
+  readable and complete with the pipeline's own credentials; it is named that
+  way deliberately, because the impersonated read is a different claim.
+
+## Aiven's free plan powers off when idle
+
+- The first MySQL connect after an idle period can take 30 seconds or more.
+  `connect_timeout` is 45 seconds. A slow first connection is not a failure.

@@ -46,8 +46,6 @@ def test_genre_and_country_extraction():
     assert extract_production_country(countries) == "US"
 
 
-
-
 def test_parse_credits_info_director_and_lead_actor():
     """Director extraction picks first job=='Director', lead actor is order==0, cast_size matches."""
     cast_raw = "[{'id': 31, 'name': 'Tom Hanks', 'order': 0, 'gender': 2}, {'id': 1289, 'name': 'Tim Allen', 'order': 1, 'gender': 2}]"

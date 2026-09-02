@@ -1,12 +1,14 @@
 import os
 import sys
 import logging
-from dotenv import load_dotenv
+
 import pandas as pd
 from google.cloud import bigquery
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("load_csv_bq")
+from pwa.connections import get_bq_client
+from pwa.settings import get_settings
+
+logger = logging.getLogger("pwa.bigquery_load_csv")
 
 OUT_DIR = os.path.join(".", "data", "out")
 
@@ -55,16 +57,11 @@ def _load_csv_to_bq(client, csv_path, table_id, schema, table_label):
 
 def load_csvs():
     """Load both CSVs into BigQuery raw_files dataset."""
-    load_dotenv()
-    project = os.getenv("GCP_PROJECT", "").strip()
-    ds_files = os.getenv("BQ_DS_FILES", "raw_files").strip()
-    location = os.getenv("BQ_LOCATION", "EU").strip()
+    settings = get_settings()
+    project = settings.gcp_project
+    ds_files = settings.bq_ds_files
 
-    if not project:
-        logger.error("GCP_PROJECT not set in .env. Cannot proceed.")
-        sys.exit(1)
-
-    client = bigquery.Client(project=project, location=location)
+    client = get_bq_client()
 
     keywords_path = os.path.join(OUT_DIR, "movie_keywords.csv")
     keywords_table = f"{project}.{ds_files}.movie_keywords"

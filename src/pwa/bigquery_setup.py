@@ -1,8 +1,7 @@
-import os
 import sys
 import logging
 import subprocess
-from dotenv import load_dotenv
+
 from google.cloud import bigquery
 from google.cloud.bigquery_connection_v1 import ConnectionServiceClient
 from google.cloud.bigquery_connection_v1.types import (
@@ -14,22 +13,16 @@ from google.cloud.bigquery_connection_v1.types import (
 )
 from google.api_core.exceptions import NotFound, AlreadyExists
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("bq_setup")
+from pwa.connections import get_bq_client
+from pwa.settings import get_settings
 
-
-def _env(key, default=""):
-    return os.getenv(key, default).strip()
+logger = logging.getLogger("pwa.bigquery_setup")
 
 
 def create_datasets(client, project, location):
     """Create the 4 BQ datasets idempotently."""
-    dataset_ids = [
-        _env("BQ_DS_REGISTRY", "raw_registry"),
-        _env("BQ_DS_CREDITS", "raw_credits"),
-        _env("BQ_DS_FILES", "raw_files"),
-        _env("BQ_DS_MART", "mart"),
-    ]
+    s = get_settings()
+    dataset_ids = [s.bq_ds_registry, s.bq_ds_credits, s.bq_ds_files, s.bq_ds_mart]
     for ds_id in dataset_ids:
         dataset_ref = bigquery.Dataset(f"{project}.{ds_id}")
         dataset_ref.location = location
@@ -53,7 +46,7 @@ def create_connection(project, location, connection_id, instance_conn_name, pg_d
         logger.info(f"BigQuery connection already exists: {full_name}")
         return existing
     except NotFound:
-        pass
+        logger.info(f"No BigQuery connection at {full_name} yet; creating it.")
 
     cloud_sql_props = CloudSqlProperties(
         instance_id=instance_conn_name,
@@ -138,7 +131,7 @@ def verify_connection(client, project, location, connection_id):
 
 def create_federated_view(client, project, location, connection_id):
     """Create the federated view for raw_credits.movie_credits."""
-    ds_credits = _env("BQ_DS_CREDITS", "raw_credits")
+    ds_credits = get_settings().bq_ds_credits
     conn_resource = f"{project}.{location}.{connection_id}"
 
     view_sql = f"""
@@ -161,7 +154,7 @@ def setup_warehouse_agent_sa(project):
     """Create warehouse-agent service account and grant minimal permissions."""
     sa_name = "warehouse-agent"
     sa_email = f"{sa_name}@{project}.iam.gserviceaccount.com"
-    ds_mart = _env("BQ_DS_MART", "mart")
+    ds_mart = get_settings().bq_ds_mart
 
     try:
         subprocess.run(
@@ -233,12 +226,9 @@ def setup_warehouse_agent_sa(project):
 
 def authorize_mart_views(client, project):
     """Authorize each mart view on each raw_* dataset so cross-dataset queries work."""
-    ds_mart = _env("BQ_DS_MART", "mart")
-    raw_datasets = [
-        _env("BQ_DS_REGISTRY", "raw_registry"),
-        _env("BQ_DS_CREDITS", "raw_credits"),
-        _env("BQ_DS_FILES", "raw_files"),
-    ]
+    s = get_settings()
+    ds_mart = s.bq_ds_mart
+    raw_datasets = [s.bq_ds_registry, s.bq_ds_credits, s.bq_ds_files]
     mart_views = [
         "v_movie",
         "v_movie_credits",
@@ -286,23 +276,16 @@ def authorize_mart_views(client, project):
 
 def run_setup():
     """Run the full BigQuery setup: datasets, connection, IAM, federated view, authorized views."""
-    load_dotenv()
-    project = _env("GCP_PROJECT")
-    location = _env("BQ_LOCATION", "EU")
-    connection_id = _env("BQ_CONNECTION_ID", "movie-credits-conn")
-    instance_conn_name = _env("PG_INSTANCE_CONNECTION_NAME")
-    pg_db = _env("PG_DB", "movie_credits")
-    pg_bq_user = _env("PG_BQ_READER_USER", "bqreader")
-    pg_bq_password = _env("PG_BQ_READER_PASSWORD")
+    s = get_settings()
+    project = s.gcp_project
+    location = s.bq_location
+    connection_id = s.bq_connection_id
+    instance_conn_name = s.pg_instance_connection_name
+    pg_db = s.pg_db
+    pg_bq_user = s.pg_bq_reader_user
+    pg_bq_password = s.pg_bq_reader_password
 
-    if not project:
-        logger.error("GCP_PROJECT not set in .env. Cannot proceed.")
-        sys.exit(1)
-    if not instance_conn_name or ":" not in instance_conn_name:
-        logger.error(f"PG_INSTANCE_CONNECTION_NAME must be PROJECT:REGION:INSTANCE, got: '{instance_conn_name}'")
-        sys.exit(1)
-
-    client = bigquery.Client(project=project, location=location)
+    client = get_bq_client()
 
     logger.info("=== STEP 1: CREATE BIGQUERY DATASETS ===")
     create_datasets(client, project, location)

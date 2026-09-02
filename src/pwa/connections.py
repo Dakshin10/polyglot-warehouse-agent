@@ -1,53 +1,55 @@
-import os
-import re
+"""Engine and client factories for the three cloud stores.
+
+There is no local-file engine here and no fallback. Every factory either returns
+a live cloud connection or raises. Failure is never silently downgraded.
+"""
+
 import logging
+import re
 from urllib.parse import quote_plus
-from dotenv import load_dotenv
+
 from sqlalchemy import create_engine, text
 from google.cloud import bigquery
+
 from pwa.settings import get_settings
 
-logger = logging.getLogger("db")
+logger = logging.getLogger("pwa.connections")
 
 
 def mask_credentials(text_msg: str) -> str:
-    """Mask passwords and credentials in DSN URLs or error logs."""
+    """Mask passwords in DSN URLs and error text before it reaches a log or a traceback."""
     if not text_msg:
         return ""
-    masked = re.sub(r":([^/@:]+)@", r":****@", str(text_msg))
-    return masked
+    return re.sub(r":([^/@:]+)@", r":****@", str(text_msg))
 
 
 def get_mysql_engine():
-    """Create SQLAlchemy engine for Aiven MySQL database with mandatory SSL and five-digit port."""
+    """Create the Aiven MySQL engine. SSL with CA verification is mandatory."""
     settings = get_settings()
 
     host = settings.mysql_host
     port = settings.mysql_port
     user = settings.mysql_user
-    password = settings.mysql_password
     dbname = settings.mysql_db
-    ssl_ca = str(settings.mysql_ssl_ca)
+    encoded_pwd = quote_plus(settings.mysql_password) if settings.mysql_password else ""
 
-    encoded_pwd = quote_plus(password) if password else ""
+    # settings validation guarantees the CA file exists and is non-empty.
+    connect_args = {"connect_timeout": 45, "ssl": {"ca": str(settings.mysql_ssl_ca)}}
+
     db_uri = f"mysql+pymysql://{user}:{encoded_pwd}@{host}:{port}/{dbname}?charset=utf8mb4"
-
-    connect_args = {"connect_timeout": 30}
-    if os.path.exists(ssl_ca) and os.path.getsize(ssl_ca) > 0:
-        connect_args["ssl"] = {"ca": os.path.abspath(ssl_ca)}
-    else:
-        connect_args["ssl"] = {"check_hostname": False}
+    root_uri = f"mysql+pymysql://{user}:{encoded_pwd}@{host}:{port}/defaultdb?charset=utf8mb4"
 
     try:
-        root_uri = f"mysql+pymysql://{user}:{encoded_pwd}@{host}:{port}/defaultdb?charset=utf8mb4"
         root_engine = create_engine(root_uri, connect_args=connect_args, pool_pre_ping=True)
         with root_engine.connect() as conn:
             conn.execute(
                 text(f"CREATE DATABASE IF NOT EXISTS `{dbname}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;")
             )
             conn.commit()
-    except Exception:
-        pass
+    except Exception as e:
+        # Not fatal on its own: the database usually already exists and the
+        # connect below is the real test. It must still be visible.
+        logger.warning(f"Could not ensure database `{dbname}` exists: {mask_credentials(str(e))}")
 
     try:
         engine = create_engine(db_uri, connect_args=connect_args, pool_pre_ping=True)
@@ -62,7 +64,7 @@ def get_mysql_engine():
 
 
 def get_pg_engine():
-    """Create SQLAlchemy engine for Cloud SQL PostgreSQL using direct or connector mode."""
+    """Create the Cloud SQL PostgreSQL engine in the configured mode ('connector' or 'direct')."""
     settings = get_settings()
 
     mode = settings.pg_connect_mode
@@ -73,13 +75,9 @@ def get_pg_engine():
     dbname = settings.pg_db
     instance_name = settings.pg_instance_connection_name
 
-    encoded_pwd = quote_plus(password) if password else ""
-
     if mode == "connector":
         logger.info(f"Connecting to PostgreSQL via Connector ({instance_name})...")
         try:
-            if not instance_name:
-                raise ValueError("PG_INSTANCE_CONNECTION_NAME not configured.")
             if "clusters" in instance_name:
                 from google.cloud.alloydb.connector import Connector, IPTypes
 
@@ -111,6 +109,7 @@ def get_pg_engine():
                     )
 
                 conn_type = "cloud_sql_connector"
+
             engine = create_engine("postgresql+pg8000://", creator=getconn, pool_pre_ping=True)
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1;"))
@@ -121,11 +120,9 @@ def get_pg_engine():
             logger.error(f"Connector mode failed: {masked_err}")
             raise RuntimeError(f"Cloud SQL Connector connection failed: {masked_err}") from e
 
-    # Direct mode
+    encoded_pwd = quote_plus(password) if password else ""
     dsn = f"postgresql+psycopg2://{user}:{encoded_pwd}@{host}:{port}/{dbname}?sslmode=require"
     try:
-        if not host or host == "localhost":
-            raise ValueError("PG_HOST not configured for Cloud SQL PostgreSQL.")
         engine = create_engine(dsn, connect_args={"connect_timeout": 15}, pool_pre_ping=True)
         with engine.connect() as conn:
             conn.execute(text("SELECT 1;"))
@@ -138,8 +135,9 @@ def get_pg_engine():
 
 
 def get_bq_client(project: str = "", location: str = "") -> bigquery.Client:
-    """Create BigQuery client for project and location."""
-    load_dotenv()
-    proj = project or os.getenv("GCP_PROJECT", "").strip()
-    loc = location or os.getenv("BQ_LOCATION", "EU").strip()
-    return bigquery.Client(project=proj, location=loc)
+    """Create a BigQuery client for the configured project and location."""
+    settings = get_settings()
+    return bigquery.Client(
+        project=project or settings.gcp_project,
+        location=location or settings.bq_location,
+    )

@@ -1,13 +1,13 @@
-import os
 import sys
 import logging
-from dotenv import load_dotenv
+
 import pandas as pd
 from google.cloud import bigquery
-from pwa.connections import get_mysql_engine
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("replicate_mysql")
+from pwa.connections import get_bq_client, get_mysql_engine
+from pwa.settings import get_settings
+
+logger = logging.getLogger("pwa.bigquery_replicate")
 
 BQ_SCHEMA_MOVIE = [
     bigquery.SchemaField("movie_id", "INT64", mode="REQUIRED"),
@@ -29,14 +29,9 @@ BQ_SCHEMA_MOVIE = [
 
 def replicate_mysql():
     """Read movie table from Aiven MySQL and load into BigQuery raw_registry.movie."""
-    load_dotenv()
-    project = os.getenv("GCP_PROJECT", "").strip()
-    ds_registry = os.getenv("BQ_DS_REGISTRY", "raw_registry").strip()
-    location = os.getenv("BQ_LOCATION", "EU").strip()
-
-    if not project:
-        logger.error("GCP_PROJECT not set in .env. Cannot proceed.")
-        sys.exit(1)
+    settings = get_settings()
+    project = settings.gcp_project
+    ds_registry = settings.bq_ds_registry
 
     logger.info("Reading movie table from Aiven MySQL via get_mysql_engine()...")
     mysql_engine, mysql_type = get_mysql_engine()
@@ -55,7 +50,7 @@ def replicate_mysql():
             r["release_date"] = None
 
     table_id = f"{project}.{ds_registry}.movie"
-    client = bigquery.Client(project=project, location=location)
+    client = get_bq_client()
 
     job_config = bigquery.LoadJobConfig(
         schema=BQ_SCHEMA_MOVIE,

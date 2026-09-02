@@ -1,96 +1,116 @@
 import pytest
+
 from pwa.settings import Settings
 
 
-def test_config_missing_required(monkeypatch, tmp_path):
-    """Missing required variables should list all missing keys in error message."""
-    empty_env = tmp_path / ".env.empty"
-    empty_env.write_text("")
-
-    for k in [
-        "KAGGLE_USERNAME",
-        "KAGGLE_KEY",
-        "MYSQL_HOST",
-        "MYSQL_PASSWORD",
-        "PG_PASSWORD",
-        "PG_INSTANCE_CONNECTION_NAME",
-        "PG_BQ_READER_PASSWORD",
-        "GCP_PROJECT",
-    ]:
-        monkeypatch.delenv(k, raising=False)
-
+def test_missing_required_lists_every_missing_key(empty_env_file):
+    """Validation must report all missing variables at once, not just the first."""
     with pytest.raises(ValueError) as excinfo:
-        Settings.from_env(env_file=str(empty_env))
+        Settings.from_env(env_file=empty_env_file)
 
-    err_msg = str(excinfo.value)
-    assert "MYSQL_HOST" in err_msg
-    assert "MYSQL_PASSWORD" in err_msg
-    assert "GCP_PROJECT" in err_msg
+    message = str(excinfo.value)
+    assert "MYSQL_HOST" in message
+    assert "MYSQL_PASSWORD" in message
+    assert "GCP_PROJECT" in message
+    assert "PG_INSTANCE_CONNECTION_NAME" in message
 
 
-def test_config_mysql_port_3306(monkeypatch, tmp_path):
-    """Aiven MySQL port cannot be 3306."""
-    ca_file = tmp_path / "ca.pem"
-    ca_file.write_text("dummy")
+def test_valid_environment_loads(valid_env):
+    settings = Settings.from_env()
+    assert settings.mysql_port == 26701
+    assert settings.bq_location == "EU"
+    assert settings.pg_instance_connection_name == "proj:europe-west1:inst"
 
-    monkeypatch.setenv("KAGGLE_USERNAME", "user")
-    monkeypatch.setenv("KAGGLE_KEY", "key")
-    monkeypatch.setenv("MYSQL_HOST", "host.aivencloud.com")
+
+def test_mysql_port_3306_rejected(valid_env, monkeypatch):
+    """Aiven MySQL never listens on 3306; a 3306 port means the wrong host is configured."""
     monkeypatch.setenv("MYSQL_PORT", "3306")
-    monkeypatch.setenv("MYSQL_PASSWORD", "pwd")
-    monkeypatch.setenv("MYSQL_SSL_CA", str(ca_file))
-    monkeypatch.setenv("PG_PASSWORD", "pwd")
-    monkeypatch.setenv("PG_INSTANCE_CONNECTION_NAME", "proj:europe-west1:inst")
-    monkeypatch.setenv("PG_BQ_READER_PASSWORD", "pwd")
-    monkeypatch.setenv("GCP_PROJECT", "proj")
-
     with pytest.raises(ValueError) as excinfo:
         Settings.from_env()
-
     assert "MYSQL_PORT cannot be 3306" in str(excinfo.value)
 
 
-def test_config_sqlite_rejection(monkeypatch, tmp_path):
-    """Setting pointing to .db or sqlite target must raise ValueError."""
-    ca_file = tmp_path / "ca.pem"
-    ca_file.write_text("dummy")
+def test_mysql_port_must_be_integer(valid_env, monkeypatch):
+    monkeypatch.setenv("MYSQL_PORT", "not-a-port")
+    with pytest.raises(ValueError) as excinfo:
+        Settings.from_env()
+    assert "MYSQL_PORT must be an integer" in str(excinfo.value)
 
-    monkeypatch.setenv("KAGGLE_USERNAME", "user")
-    monkeypatch.setenv("KAGGLE_KEY", "key")
-    monkeypatch.setenv("MYSQL_HOST", "host.aivencloud.com")
-    monkeypatch.setenv("MYSQL_PORT", "26701")
-    monkeypatch.setenv("MYSQL_PASSWORD", "pwd")
-    monkeypatch.setenv("MYSQL_SSL_CA", str(ca_file))
-    monkeypatch.setenv("PG_PASSWORD", "pwd")
-    monkeypatch.setenv("PG_INSTANCE_CONNECTION_NAME", "proj:europe-west1:inst")
-    monkeypatch.setenv("PG_BQ_READER_PASSWORD", "pwd")
-    monkeypatch.setenv("GCP_PROJECT", "proj")
+
+def test_missing_ssl_ca_rejected(valid_env, monkeypatch, tmp_path):
+    """A missing CA file must fail validation, not silently downgrade the TLS handshake."""
+    monkeypatch.setenv("MYSQL_SSL_CA", str(tmp_path / "does-not-exist.pem"))
+    with pytest.raises(ValueError) as excinfo:
+        Settings.from_env()
+    assert "MYSQL_SSL_CA does not exist on disk" in str(excinfo.value)
+
+
+def test_empty_ssl_ca_rejected(valid_env, monkeypatch, tmp_path):
+    empty = tmp_path / "empty.pem"
+    empty.write_text("")
+    monkeypatch.setenv("MYSQL_SSL_CA", str(empty))
+    with pytest.raises(ValueError) as excinfo:
+        Settings.from_env()
+    assert "MYSQL_SSL_CA exists but is empty" in str(excinfo.value)
+
+
+def test_instance_connection_name_shape(valid_env, monkeypatch):
+    monkeypatch.setenv("PG_INSTANCE_CONNECTION_NAME", "proj:inst")
+    with pytest.raises(ValueError) as excinfo:
+        Settings.from_env()
+    assert "PROJECT:REGION:INSTANCE" in str(excinfo.value)
+
+
+def test_local_file_db_target_rejected(valid_env, monkeypatch):
+    """This project has no local-file store: a sqlite target anywhere must fail loudly."""
     monkeypatch.setenv("MY_SQLITE_TARGET", "sqlite:///test.db")
-
     with pytest.raises(ValueError) as excinfo:
         Settings.from_env()
-
     assert "SQLite target forbidden" in str(excinfo.value)
+    monkeypatch.delenv("MY_SQLITE_TARGET")
 
 
-def test_config_region_location_mismatch(monkeypatch, tmp_path):
-    """BQ location mismatch with Cloud SQL region must raise ValueError."""
-    ca_file = tmp_path / "ca.pem"
-    ca_file.write_text("dummy")
+def test_unrelated_value_containing_db_is_not_rejected(valid_env, monkeypatch):
+    """The rejection matches connection targets, not any value that happens to contain '.db'."""
+    monkeypatch.setenv("SOME_TOOL_HOME", "C:/tools/.dbeaver/config")
+    settings = Settings.from_env()
+    assert settings.gcp_project == "proj"
+    monkeypatch.delenv("SOME_TOOL_HOME")
 
-    monkeypatch.setenv("KAGGLE_USERNAME", "user")
-    monkeypatch.setenv("KAGGLE_KEY", "key")
-    monkeypatch.setenv("MYSQL_HOST", "host.aivencloud.com")
-    monkeypatch.setenv("MYSQL_PORT", "26701")
-    monkeypatch.setenv("MYSQL_PASSWORD", "pwd")
-    monkeypatch.setenv("MYSQL_SSL_CA", str(ca_file))
-    monkeypatch.setenv("PG_PASSWORD", "pwd")
-    monkeypatch.setenv("PG_INSTANCE_CONNECTION_NAME", "proj:europe-west1:inst")
-    monkeypatch.setenv("PG_BQ_READER_PASSWORD", "pwd")
-    monkeypatch.setenv("GCP_PROJECT", "proj")
-    monkeypatch.setenv("BQ_LOCATION", "US")  # Mismatch with europe-west1
 
+def test_region_location_mismatch_rejected(valid_env, monkeypatch):
+    """europe-west1 is not covered by the US multi-region; the error must name both values."""
+    monkeypatch.setenv("BQ_LOCATION", "US")
     with pytest.raises(ValueError) as excinfo:
         Settings.from_env()
+    message = str(excinfo.value)
+    assert "incompatible with Cloud SQL region" in message
+    assert "europe-west1" in message
+    assert "US" in message
 
-    assert "incompatible with Cloud SQL region" in str(excinfo.value)
+
+def test_exact_region_is_accepted(valid_env, monkeypatch):
+    monkeypatch.setenv("BQ_LOCATION", "europe-west1")
+    assert Settings.from_env().bq_location == "europe-west1"
+
+
+def test_us_region_maps_to_us_multiregion(valid_env, monkeypatch):
+    monkeypatch.setenv("PG_INSTANCE_CONNECTION_NAME", "proj:us-central1:inst")
+    monkeypatch.setenv("BQ_LOCATION", "US")
+    assert Settings.from_env().bq_location == "US"
+
+
+def test_direct_mode_requires_host(valid_env, monkeypatch):
+    monkeypatch.setenv("PG_CONNECT_MODE", "direct")
+    with pytest.raises(ValueError) as excinfo:
+        Settings.from_env()
+    assert "PG_HOST is empty" in str(excinfo.value)
+
+
+def test_secrets_are_redacted(valid_env):
+    rows = dict(Settings.from_env().redacted_rows())
+    assert rows["mysql_password"] == "***"
+    assert rows["pg_password"] == "***"
+    assert rows["pg_bq_reader_password"] == "***"
+    assert rows["kaggle_key"] == "***"
+    assert rows["mysql_host"] == "host.aivencloud.com"

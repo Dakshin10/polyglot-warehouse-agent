@@ -1,10 +1,10 @@
 import os
 import sys
 import logging
-from dotenv import load_dotenv
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("download")
+from pwa.settings import get_settings
+
+logger = logging.getLogger("pwa.kaggle_download")
 
 RAW_DIR = os.path.join(".", "data", "raw")
 EXPECTED_FILES = [
@@ -31,7 +31,7 @@ def check_raw_files_exist() -> bool:
 
 def download_dataset():
     """Download the Kaggle dataset rounakbanik/the-movies-dataset into ./data/raw/."""
-    load_dotenv()
+    settings = get_settings()
 
     os.makedirs(RAW_DIR, exist_ok=True)
 
@@ -44,13 +44,11 @@ def download_dataset():
 
     logger.info("Downloading dataset rounakbanik/the-movies-dataset from Kaggle...")
 
-    kaggle_user = os.getenv("KAGGLE_USERNAME")
-    kaggle_key = os.getenv("KAGGLE_KEY")
-
-    if kaggle_user:
-        os.environ["KAGGLE_USERNAME"] = kaggle_user
-    if kaggle_key:
-        os.environ["KAGGLE_KEY"] = kaggle_key
+    # The Kaggle client reads its credentials from the process environment.
+    if settings.kaggle_username:
+        os.environ["KAGGLE_USERNAME"] = settings.kaggle_username
+    if settings.kaggle_key:
+        os.environ["KAGGLE_KEY"] = settings.kaggle_key
 
     try:
         from kaggle.api.kaggle_api_extended import KaggleApi

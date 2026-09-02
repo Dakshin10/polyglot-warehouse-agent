@@ -1,13 +1,14 @@
-import os
 import sys
 import logging
-from dotenv import load_dotenv
+
 from google.cloud import bigquery
+
 from pwa.bigquery_setup import authorize_mart_views
+from pwa.connections import get_bq_client
+from pwa.settings import get_settings
 from pwa.sql_files import read_sql_file, sql_file_path
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger("build_mart")
+logger = logging.getLogger("pwa.bigquery_mart")
 
 
 def _split_sql_statements(sql_text):
@@ -77,15 +78,9 @@ def _execute_sql_file(client, filename, project, label):
 
 def build_mart():
     """Build all mart views and apply all column descriptions."""
-    load_dotenv()
-    project = os.getenv("GCP_PROJECT", "").strip()
-    location = os.getenv("BQ_LOCATION", "EU").strip()
-
-    if not project:
-        logger.error("GCP_PROJECT not set in .env. Cannot proceed.")
-        sys.exit(1)
-
-    client = bigquery.Client(project=project, location=location)
+    settings = get_settings()
+    project = settings.gcp_project
+    client = get_bq_client()
 
     logger.info("=== STEP 3: BUILD MART LAYER ===")
 
