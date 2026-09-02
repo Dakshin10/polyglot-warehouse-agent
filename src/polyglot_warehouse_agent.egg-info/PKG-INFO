@@ -1,3 +1,21 @@
+Metadata-Version: 2.4
+Name: polyglot-warehouse-agent
+Version: 0.1.0
+Summary: Polyglot warehouse agent data pipeline
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: python-dotenv
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: sqlalchemy
+Requires-Dist: pymysql
+Requires-Dist: psycopg2-binary
+Requires-Dist: pg8000
+Requires-Dist: cloud-sql-python-connector[pg8000]
+Requires-Dist: google-cloud-bigquery
+Requires-Dist: google-cloud-bigquery-connection
+Requires-Dist: kaggle
+
 # Polyglot Warehouse Agent — Aiven MySQL + Cloud SQL PostgreSQL Dataset
 
 Build a strictly relational dataset across two different database engines on two different cloud providers (**Aiven MySQL** and **Cloud SQL PostgreSQL**) from Kaggle's *The Movies Dataset*.

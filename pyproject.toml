@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "polyglot-warehouse-agent"
+version = "0.1.0"
+description = "Polyglot warehouse agent data pipeline"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "python-dotenv",
+    "pandas",
+    "numpy",
+    "sqlalchemy",
+    "pymysql",
+    "psycopg2-binary",
+    "pg8000",
+    "cloud-sql-python-connector[pg8000]",
+    "google-cloud-bigquery",
+    "google-cloud-bigquery-connection",
+    "kaggle",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"pwa.sql" = ["**/*.sql"]
