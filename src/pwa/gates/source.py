@@ -46,55 +46,73 @@ def run_all_gates():
 
     # GATE 2: Postgres COUNT == 1000
     gate2_pass = len(pg_df) == 1000
-    results.append(("GATE 2", "Postgres SELECT COUNT(*) FROM movie_credits == 1000", f"Actual: {len(pg_df)}", gate2_pass))
+    results.append(
+        ("GATE 2", "Postgres SELECT COUNT(*) FROM movie_credits == 1000", f"Actual: {len(pg_df)}", gate2_pass)
+    )
 
     # GATE 3: set(mysql movie_id) == set(postgres movie_id)
     mysql_ids = set(mysql_df["movie_id"])
     pg_ids = set(pg_df["movie_id"])
-    gate3_pass = (mysql_ids == pg_ids)
+    gate3_pass = mysql_ids == pg_ids
     results.append(("GATE 3", "set(mysql movie_id) == set(postgres movie_id)", f"Equal: {gate3_pass}", gate3_pass))
 
     # GATE 4: orphan filings (pg ids not in mysql) == 0
     orphans = len(pg_ids - mysql_ids)
-    gate4_pass = (orphans == 0)
+    gate4_pass = orphans == 0
     results.append(("GATE 4", "Orphan filings (pg ids not in mysql) == 0", f"Actual: {orphans}", gate4_pass))
 
     # GATE 5: missing credits (mysql ids not in pg) == 0
     missing_credits = len(mysql_ids - pg_ids)
-    gate5_pass = (missing_credits == 0)
+    gate5_pass = missing_credits == 0
     results.append(("GATE 5", "Missing credits (mysql ids not in pg) == 0", f"Actual: {missing_credits}", gate5_pass))
 
     # GATE 6: duplicate movie_id in either table == 0
     mysql_dups = mysql_df["movie_id"].duplicated().sum()
     pg_dups = pg_df["movie_id"].duplicated().sum()
-    gate6_pass = (mysql_dups == 0 and pg_dups == 0)
-    results.append(("GATE 6", "Duplicate movie_id in either table == 0", f"MySQL dups: {mysql_dups}, PG dups: {pg_dups}", gate6_pass))
+    gate6_pass = mysql_dups == 0 and pg_dups == 0
+    results.append(
+        (
+            "GATE 6",
+            "Duplicate movie_id in either table == 0",
+            f"MySQL dups: {mysql_dups}, PG dups: {pg_dups}",
+            gate6_pass,
+        )
+    )
 
     # GATE 7: NULL director_name in postgres == 0
     null_directors = pg_df["director_name"].isna().sum() + (pg_df["director_name"].astype(str).str.strip() == "").sum()
-    gate7_pass = (null_directors == 0)
+    gate7_pass = null_directors == 0
     results.append(("GATE 7", "NULL director_name in postgres == 0", f"Actual: {null_directors}", gate7_pass))
 
     # GATE 8: movie_keywords.csv distinct movie_id == 1000
     distinct_kw_ids = keywords_df["movie_id"].nunique() if not keywords_df.empty else 0
-    gate8_pass = (distinct_kw_ids == 1000)
+    gate8_pass = distinct_kw_ids == 1000
     results.append(("GATE 8", "movie_keywords.csv distinct movie_id == 1000", f"Actual: {distinct_kw_ids}", gate8_pass))
 
     # GATE 9: movie_ratings_agg.csv rows == 1000
     ratings_rows = len(ratings_df) if not ratings_df.empty else 0
-    gate9_pass = (ratings_rows == 1000)
+    gate9_pass = ratings_rows == 1000
     results.append(("GATE 9", "movie_ratings_agg.csv rows == 1000", f"Actual: {ratings_rows}", gate9_pass))
 
     # GATE 10: keyword/ratings movie_ids <= mysql movie_id set
     kw_ids = set(keywords_df["movie_id"]) if not keywords_df.empty else set()
     rat_ids = set(ratings_df["movie_id"]) if not ratings_df.empty else set()
     gate10_pass = kw_ids.issubset(mysql_ids) and rat_ids.issubset(mysql_ids)
-    results.append(("GATE 10", "keyword/ratings movie_ids <= mysql movie_id set", f"Subset: {gate10_pass}", gate10_pass))
+    results.append(
+        ("GATE 10", "keyword/ratings movie_ids <= mysql movie_id set", f"Subset: {gate10_pass}", gate10_pass)
+    )
 
     # GATE 11: budget_usd > 0 and revenue_usd > 0 for all rows
     invalid_budget_rev = ((mysql_df["budget_usd"] <= 0) | (mysql_df["revenue_usd"] <= 0)).sum()
-    gate11_pass = (invalid_budget_rev == 0)
-    results.append(("GATE 11", "budget_usd > 0 and revenue_usd > 0 for all rows", f"Invalid rows: {invalid_budget_rev}", gate11_pass))
+    gate11_pass = invalid_budget_rev == 0
+    results.append(
+        (
+            "GATE 11",
+            "budget_usd > 0 and revenue_usd > 0 for all rows",
+            f"Invalid rows: {invalid_budget_rev}",
+            gate11_pass,
+        )
+    )
 
     # GATE 12: no mojibake in title (round-trip utf8mb4 check)
     def check_mojibake(title):
@@ -104,8 +122,10 @@ def run_all_gates():
             return False
 
     mojibake_count = (~mysql_df["title"].apply(check_mojibake)).sum()
-    gate12_pass = (mojibake_count == 0)
-    results.append(("GATE 12", "No mojibake in title (round-trip utf8mb4 check)", f"Corrupt titles: {mojibake_count}", gate12_pass))
+    gate12_pass = mojibake_count == 0
+    results.append(
+        ("GATE 12", "No mojibake in title (round-trip utf8mb4 check)", f"Corrupt titles: {mojibake_count}", gate12_pass)
+    )
 
     # GATE 13: Cross-engine join proof
     join_result = None
@@ -115,9 +135,7 @@ def run_all_gates():
             mysql_df.merge(pg_df, on="movie_id")
             .assign(roi=lambda d: d.revenue_usd / d.budget_usd)
             .groupby("director_name")
-            .agg(films=("movie_id", "count"),
-                 median_roi=("roi", "median"),
-                 total_revenue=("revenue_usd", "sum"))
+            .agg(films=("movie_id", "count"), median_roi=("roi", "median"), total_revenue=("revenue_usd", "sum"))
             .query("films >= 2")
             .sort_values("median_roi", ascending=False)
             .head(10)
@@ -129,9 +147,16 @@ def run_all_gates():
         logger.error(f"Gate 13 computation error: {e}")
         gate13_pass = False
 
-    results.append(("GATE 13", "Cross-engine join proof (top 10 directors >= 2 films)", f"Rows: {len(join_result) if join_result is not None else 0}", gate13_pass))
+    results.append(
+        (
+            "GATE 13",
+            "Cross-engine join proof (top 10 directors >= 2 films)",
+            f"Rows: {len(join_result) if join_result is not None else 0}",
+            gate13_pass,
+        )
+    )
 
-    print("\n" + "="*85)
+    print("\n" + "=" * 85)
     print(f"{'GATE':<8} | {'DESCRIPTION':<50} | {'STATUS':<8} | {'DETAILS'}")
     print("-" * 85)
     all_passed = True
@@ -140,12 +165,12 @@ def run_all_gates():
         if not status:
             all_passed = False
         print(f"{gate_id:<8} | {desc:<50} | {status_str:<8} | {details}")
-    print("="*85 + "\n")
+    print("=" * 85 + "\n")
 
     if join_result is not None:
         print("=== GATE 13: CROSS-ENGINE JOIN PROOF TOP 10 DIRECTORS BY MEDIAN ROI ===")
         print(join_result.to_string())
-        print("="*85 + "\n")
+        print("=" * 85 + "\n")
 
     if not all_passed:
         logger.error("FATAL: One or more verification gates failed.")

@@ -1,7 +1,13 @@
 import os
 import logging
 import pandas as pd
-from .clean import safe_literal_eval, extract_primary_genre, extract_production_country, parse_credits_info, swallowed_exceptions_count
+from .clean import (
+    safe_literal_eval,
+    extract_primary_genre,
+    extract_production_country,
+    parse_credits_info,
+    swallowed_exceptions_count,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("transform")
@@ -28,7 +34,9 @@ def transform_and_select():
     links_df = pd.read_csv(links_raw_path, low_memory=False)
     ratings_df = pd.read_csv(ratings_raw_path, low_memory=False)
 
-    logger.info(f"Raw rows count - Metadata: {len(meta_df)}, Credits: {len(credits_df)}, Keywords: {len(keywords_df)}, Links: {len(links_df)}, Ratings: {len(ratings_df)}")
+    logger.info(
+        f"Raw rows count - Metadata: {len(meta_df)}, Credits: {len(credits_df)}, Keywords: {len(keywords_df)}, Links: {len(links_df)}, Ratings: {len(ratings_df)}"
+    )
 
     # Clean Metadata
     meta_df["movie_id"] = pd.to_numeric(meta_df["id"], errors="coerce")
@@ -48,7 +56,9 @@ def transform_and_select():
     meta_clean["release_date_str"] = meta_clean["release_date_dt"].dt.strftime("%Y-%m-%d")
     meta_clean["release_year"] = meta_clean["release_date_dt"].dt.year.fillna(0).astype(int)
 
-    meta_clean = meta_clean.sort_values(by="vote_count", ascending=False).drop_duplicates(subset=["movie_id"], keep="first")
+    meta_clean = meta_clean.sort_values(by="vote_count", ascending=False).drop_duplicates(
+        subset=["movie_id"], keep="first"
+    )
     logger.info(f"Cleaned Metadata rows after deduplication: {len(meta_clean)}")
 
     meta_clean["genres_parsed"] = meta_clean["genres"].apply(safe_literal_eval)
@@ -75,7 +85,11 @@ def transform_and_select():
         c_info["movie_id"] = mid
         credits_parsed_list.append(c_info)
 
-        if c_info["cast_size"] > 0 and c_info["director_name"] is not None and len(str(c_info["director_name"]).strip()) > 0:
+        if (
+            c_info["cast_size"] > 0
+            and c_info["director_name"] is not None
+            and len(str(c_info["director_name"]).strip()) > 0
+        ):
             valid_credits_ids.add(mid)
 
     parsed_credits_df = pd.DataFrame(credits_parsed_list)
@@ -88,7 +102,11 @@ def transform_and_select():
     keywords_clean = keywords_clean.drop_duplicates(subset=["movie_id"], keep="first")
 
     keywords_clean["keywords_parsed"] = keywords_clean["keywords"].apply(safe_literal_eval)
-    valid_keywords_ids = set(keywords_clean[keywords_clean["keywords_parsed"].apply(lambda x: isinstance(x, list) and len(x) > 0)]["movie_id"])
+    valid_keywords_ids = set(
+        keywords_clean[keywords_clean["keywords_parsed"].apply(lambda x: isinstance(x, list) and len(x) > 0)][
+            "movie_id"
+        ]
+    )
     logger.info(f"Keywords rows with non-empty keyword list: {len(valid_keywords_ids)}")
 
     # Clean Links & Ratings
@@ -103,16 +121,22 @@ def transform_and_select():
     ratings_clean = ratings_df.dropna(subset=["movielens_id"]).copy()
     ratings_clean["movielens_id"] = ratings_clean["movielens_id"].astype(int)
 
-    ratings_joined = ratings_clean.merge(links_clean[["movielens_id", "movie_id", "imdbId"]], on="movielens_id", how="inner")
+    ratings_joined = ratings_clean.merge(
+        links_clean[["movielens_id", "movie_id", "imdbId"]], on="movielens_id", how="inner"
+    )
 
-    ratings_agg = ratings_joined.groupby("movie_id").agg(
-        movielens_id=("movielens_id", "first"),
-        imdb_id=("imdbId", "first"),
-        rating_count=("rating", "count"),
-        avg_rating=("rating", "mean"),
-        min_rating=("rating", "min"),
-        max_rating=("rating", "max")
-    ).reset_index()
+    ratings_agg = (
+        ratings_joined.groupby("movie_id")
+        .agg(
+            movielens_id=("movielens_id", "first"),
+            imdb_id=("imdbId", "first"),
+            rating_count=("rating", "count"),
+            avg_rating=("rating", "mean"),
+            min_rating=("rating", "min"),
+            max_rating=("rating", "max"),
+        )
+        .reset_index()
+    )
 
     ratings_agg["avg_rating"] = ratings_agg["avg_rating"].round(4)
     ratings_agg["min_rating"] = ratings_agg["min_rating"].round(2)
@@ -144,25 +168,33 @@ def transform_and_select():
     logger.info(f"Candidates with default rules (rating_count >= 5, budget > 0, revenue > 0): {len(candidates)}")
 
     if len(candidates) < 1000:
-        logger.warning(f"Only {len(candidates)} candidates found. Triggering relaxation ladder step 1: drop budget > 0 constraint.")
+        logger.warning(
+            f"Only {len(candidates)} candidates found. Triggering relaxation ladder step 1: drop budget > 0 constraint."
+        )
         req_budget = False
         candidates = get_candidate_ids(min_rating_threshold, req_budget, req_revenue)
         logger.info(f"Candidates after relaxation step 1: {len(candidates)}")
 
     if len(candidates) < 1000:
-        logger.warning(f"Only {len(candidates)} candidates found. Triggering relaxation ladder step 2: drop revenue > 0 constraint.")
+        logger.warning(
+            f"Only {len(candidates)} candidates found. Triggering relaxation ladder step 2: drop revenue > 0 constraint."
+        )
         req_revenue = False
         candidates = get_candidate_ids(min_rating_threshold, req_budget, req_revenue)
         logger.info(f"Candidates after relaxation step 2: {len(candidates)}")
 
     if len(candidates) < 1000:
-        logger.warning(f"Only {len(candidates)} candidates found. Triggering relaxation ladder step 3: lower rating threshold to 1.")
+        logger.warning(
+            f"Only {len(candidates)} candidates found. Triggering relaxation ladder step 3: lower rating threshold to 1."
+        )
         min_rating_threshold = 1
         candidates = get_candidate_ids(min_rating_threshold, req_budget, req_revenue)
         logger.info(f"Candidates after relaxation step 3: {len(candidates)}")
 
     if len(candidates) < 1000:
-        logger.error(f"FATAL: Insufficient candidate movies even after relaxation ({len(candidates)} < 1000). Cannot proceed.")
+        logger.error(
+            f"FATAL: Insufficient candidate movies even after relaxation ({len(candidates)} < 1000). Cannot proceed."
+        )
         raise ValueError(f"Selection criteria yielded only {len(candidates)} rows, exactly 1,000 required.")
 
     selected_meta = candidates.sort_values(by=["vote_count", "movie_id"], ascending=[False, True]).head(1000).copy()
@@ -174,18 +206,34 @@ def transform_and_select():
     logger.info(f"Saved {os.path.join(OUT_DIR, 'selected_movie_ids.csv')}")
 
     # Output 1: MySQL movie table
-    mysql_movie = selected_meta[[
-        "movie_id", "title", "original_title", "original_language",
-        "release_date_str", "release_year", "runtime", "budget", "revenue",
-        "primary_genre", "production_country", "vote_average", "vote_count", "popularity"
-    ]].copy()
+    mysql_movie = selected_meta[
+        [
+            "movie_id",
+            "title",
+            "original_title",
+            "original_language",
+            "release_date_str",
+            "release_year",
+            "runtime",
+            "budget",
+            "revenue",
+            "primary_genre",
+            "production_country",
+            "vote_average",
+            "vote_count",
+            "popularity",
+        ]
+    ].copy()
 
-    mysql_movie.rename(columns={
-        "release_date_str": "release_date",
-        "runtime": "runtime_min",
-        "budget": "budget_usd",
-        "revenue": "revenue_usd"
-    }, inplace=True)
+    mysql_movie.rename(
+        columns={
+            "release_date_str": "release_date",
+            "runtime": "runtime_min",
+            "budget": "budget_usd",
+            "revenue": "revenue_usd",
+        },
+        inplace=True,
+    )
 
     mysql_movie["release_date"] = pd.to_datetime(mysql_movie["release_date"]).dt.date
 
@@ -195,11 +243,20 @@ def transform_and_select():
     selected_credits = selected_credits.sort_values("movie_id").reset_index(drop=True)
     selected_credits["credit_id"] = range(1, len(selected_credits) + 1)
 
-    pg_credits = selected_credits[[
-        "credit_id", "movie_id", "director_name", "director_gender",
-        "lead_actor_name", "second_actor_name", "lead_actor_gender",
-        "cast_size", "crew_size", "producer_name"
-    ]].copy()
+    pg_credits = selected_credits[
+        [
+            "credit_id",
+            "movie_id",
+            "director_name",
+            "director_gender",
+            "lead_actor_name",
+            "second_actor_name",
+            "lead_actor_gender",
+            "cast_size",
+            "crew_size",
+            "producer_name",
+        ]
+    ].copy()
 
     pg_credits["director_gender"] = pd.to_numeric(pg_credits["director_gender"], errors="coerce").astype("Int16")
     pg_credits["lead_actor_gender"] = pd.to_numeric(pg_credits["lead_actor_gender"], errors="coerce").astype("Int16")
@@ -214,11 +271,9 @@ def transform_and_select():
         if isinstance(kw_list, list):
             for kw in kw_list:
                 if isinstance(kw, dict):
-                    exploded_keywords.append({
-                        "movie_id": mid,
-                        "keyword_id": kw.get("id"),
-                        "keyword": str(kw.get("name", "")).strip()
-                    })
+                    exploded_keywords.append(
+                        {"movie_id": mid, "keyword_id": kw.get("id"), "keyword": str(kw.get("name", "")).strip()}
+                    )
 
     keywords_out_df = pd.DataFrame(exploded_keywords)
     keywords_out_df.to_csv(os.path.join(OUT_DIR, "movie_keywords.csv"), index=False)
@@ -229,9 +284,9 @@ def transform_and_select():
     ratings_selected["movie_id"] = pd.Categorical(ratings_selected["movie_id"], categories=selected_ids, ordered=True)
     ratings_selected = ratings_selected.sort_values("movie_id").reset_index(drop=True)
 
-    ratings_out_df = ratings_selected[[
-        "movie_id", "movielens_id", "imdb_id", "rating_count", "avg_rating", "min_rating", "max_rating"
-    ]].copy()
+    ratings_out_df = ratings_selected[
+        ["movie_id", "movielens_id", "imdb_id", "rating_count", "avg_rating", "min_rating", "max_rating"]
+    ].copy()
 
     ratings_out_df.to_csv(os.path.join(OUT_DIR, "movie_ratings_agg.csv"), index=False)
     logger.info(f"Saved {os.path.join(OUT_DIR, 'movie_ratings_agg.csv')} ({len(ratings_out_df)} rows)")

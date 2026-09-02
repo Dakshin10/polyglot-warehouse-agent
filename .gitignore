@@ -1,7 +1,31 @@
+# Environment & Security
 .env
-./certs/
-./data/
+.env.local
+certs/
+
+# Data Directories
+data/
+
+# Python Virtual Environments & Packages
 venv/
+ENV/
+env/
+*.egg-info/
+build/
+dist/
+
+# Byte-compiled / Optimized / Caches
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# SQLite Databases (Forbidden)
 *.db
+*.sqlite
+*.sqlite3
+
+# Tool Caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/

@@ -15,7 +15,7 @@ layer for downstream agent consumption.
 │  .movie (1000 rows) │     │  .movie_credits (1000) │
 └────────┬────────────┘     └───────────┬────────────┘
          │ Python batch                 │ EXTERNAL_QUERY
-         │ (replicate_mysql.py)         │ (federated, live)
+         │ (replicate_mysql)            │ (federated, live)
          ▼                             ▼
 ┌────────────────┐          ┌────────────────────────┐
 │ raw_registry   │          │ raw_credits            │
@@ -91,25 +91,20 @@ BQ_DS_FILES=raw_files
 BQ_DS_MART=mart
 ```
 
-Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
 ---
 
 ## Execution
 
 ```bash
-python -m src.bq_pipeline
+pwa warehouse run
 ```
 
 Pipeline stages:
-1. **Setup** (`src/bq_setup.py`): Create 4 datasets, BigQuery connection to Cloud SQL, grant IAM, verify connection, create federated view, setup agent SA, authorize mart views
-2. **Replicate MySQL** (`src/replicate_mysql.py`): Aiven MySQL → `raw_registry.movie` (WRITE_TRUNCATE)
-3. **Load CSVs** (`src/load_csv_bq.py`): CSVs → `raw_files.movie_keywords` and `raw_files.movie_ratings_agg`
-4. **Build Mart** (`src/build_mart.py`): Execute `sql/bq_mart.sql` (5 views) then `sql/bq_descriptions.sql` (all descriptions)
-5. **Verify** (`src/verify_bq.py`): 15 verification gates
+1. **Setup** (`pwa.warehouse.setup`): Create 4 datasets, BigQuery connection to Cloud SQL, grant IAM, verify connection, create federated view, setup agent SA, authorize mart views
+2. **Replicate MySQL** (`pwa.ingest.replicate`): Aiven MySQL → `raw_registry.movie` (WRITE_TRUNCATE)
+3. **Load CSVs** (`pwa.ingest.csv_to_bq`): CSVs → `raw_files.movie_keywords` and `raw_files.movie_ratings_agg`
+4. **Build Mart** (`pwa.warehouse.mart`): Execute `views.sql` (5 views) then `descriptions.sql` (all descriptions)
+5. **Verify** (`pwa.gates.warehouse`): 15 verification gates
 
 ---
 
@@ -132,36 +127,3 @@ Pipeline stages:
 | B13 | selected_movie_ids.csv SHA-256 stable | matches fixture |
 | B14 | Federation liveness (mutate PG, observe in BQ) | count changes |
 | B15 | Cross-engine proof (top 10 directors by ROI) | >= 10 rows |
-
----
-
-## Troubleshooting
-
-- **"Dataset not found" on EXTERNAL_QUERY**: Location mismatch. The BQ dataset,
-  connection, and Cloud SQL instance must be in the same region family. Check
-  `BQ_LOCATION` matches your Cloud SQL region.
-- **Connection appears healthy but queries fail**: The connection's service
-  agent needs `roles/cloudsql.client`. This fails at query time, not at
-  connection creation.
-- **Permission denied on mart views**: Mart views need to be authorized on each
-  `raw_*` dataset. Run `authorize_mart_views()` in `bq_setup.py`.
-- **Budget/revenue as FLOAT64**: Ensure `replicate_mysql.py` uses the explicit
-  BQ schema with INT64, not autodetect.
-- **Postgres lowercase columns**: `EXTERNAL_QUERY` returns lowercase column
-  names regardless of DDL casing. This is expected Postgres behavior.
-
----
-
-## Files
-
-```
-src/bq_setup.py           Datasets + connection + IAM + authorized views
-src/replicate_mysql.py     Aiven MySQL → raw_registry (batch replicate)
-src/load_csv_bq.py         CSVs → raw_files (batch load)
-src/build_mart.py          Executes bq_mart.sql + bq_descriptions.sql
-src/verify_bq.py           15 verification gates (B1–B15)
-src/bq_pipeline.py         Entry point, stops on first failure
-sql/bq_mart.sql            5 mart view definitions
-sql/bq_descriptions.sql    View and column descriptions for ADK agent
-sql/agent_demo_queries.sql 8 escalating demo queries
-```

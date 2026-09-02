@@ -92,21 +92,29 @@ def grant_connection_service_agent(project, connection):
     try:
         subprocess.run(
             [
-                "gcloud", "projects", "add-iam-policy-binding", project,
+                "gcloud",
+                "projects",
+                "add-iam-policy-binding",
+                project,
                 f"--member=serviceAccount:{sa_email}",
                 "--role=roles/cloudsql.client",
                 "--condition=None",
                 "--quiet",
             ],
-            check=True, capture_output=True, text=True, shell=True
+            check=True,
+            capture_output=True,
+            text=True,
+            shell=True,
         )
         logger.info(f"Granted roles/cloudsql.client to {sa_email}")
     except subprocess.CalledProcessError as e:
         logger.warning(f"IAM grant via gcloud failed (may already exist): {e.stderr}")
     except FileNotFoundError:
         logger.warning("gcloud CLI not found. Please grant roles/cloudsql.client manually:")
-        logger.warning(f"  gcloud projects add-iam-policy-binding {project} "
-                       f"--member=serviceAccount:{sa_email} --role=roles/cloudsql.client")
+        logger.warning(
+            f"  gcloud projects add-iam-policy-binding {project} "
+            f"--member=serviceAccount:{sa_email} --role=roles/cloudsql.client"
+        )
 
 
 def verify_connection(client, project, location, connection_id):
@@ -157,11 +165,20 @@ def setup_warehouse_agent_sa(project):
 
     try:
         subprocess.run(
-            ["gcloud", "iam", "service-accounts", "create", sa_name,
-             f"--project={project}",
-             "--display-name=Warehouse Agent SA",
-             "--quiet"],
-            check=True, capture_output=True, text=True, shell=True
+            [
+                "gcloud",
+                "iam",
+                "service-accounts",
+                "create",
+                sa_name,
+                f"--project={project}",
+                "--display-name=Warehouse Agent SA",
+                "--quiet",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            shell=True,
         )
         logger.info(f"Created service account: {sa_email}")
     except subprocess.CalledProcessError as e:
@@ -172,11 +189,20 @@ def setup_warehouse_agent_sa(project):
 
     try:
         subprocess.run(
-            ["gcloud", "projects", "add-iam-policy-binding", project,
-             f"--member=serviceAccount:{sa_email}",
-             "--role=roles/bigquery.jobUser",
-             "--condition=None", "--quiet"],
-            check=True, capture_output=True, text=True, shell=True
+            [
+                "gcloud",
+                "projects",
+                "add-iam-policy-binding",
+                project,
+                f"--member=serviceAccount:{sa_email}",
+                "--role=roles/bigquery.jobUser",
+                "--condition=None",
+                "--quiet",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            shell=True,
         )
         logger.info(f"Granted roles/bigquery.jobUser to {sa_email}")
     except subprocess.CalledProcessError as e:
@@ -184,11 +210,17 @@ def setup_warehouse_agent_sa(project):
 
     try:
         subprocess.run(
-            ["bq", "add-iam-policy-binding",
-             f"--member=serviceAccount:{sa_email}",
-             "--role=roles/bigquery.dataViewer",
-             f"{project}:{ds_mart}"],
-            check=True, capture_output=True, text=True, shell=True
+            [
+                "bq",
+                "add-iam-policy-binding",
+                f"--member=serviceAccount:{sa_email}",
+                "--role=roles/bigquery.dataViewer",
+                f"{project}:{ds_mart}",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            shell=True,
         )
         logger.info(f"Granted roles/bigquery.dataViewer on {ds_mart} to {sa_email}")
     except subprocess.CalledProcessError as e:
@@ -208,8 +240,11 @@ def authorize_mart_views(client, project):
         _env("BQ_DS_FILES", "raw_files"),
     ]
     mart_views = [
-        "v_movie", "v_movie_credits", "v_movie_full",
-        "v_movie_keywords", "v_integrity_exceptions",
+        "v_movie",
+        "v_movie_credits",
+        "v_movie_full",
+        "v_movie_keywords",
+        "v_integrity_exceptions",
     ]
 
     for raw_ds_id in raw_datasets:
@@ -217,7 +252,8 @@ def authorize_mart_views(client, project):
         access_entries = list(dataset_ref.access_entries)
         existing_views = {
             (e.entity_id.get("projectId"), e.entity_id.get("datasetId"), e.entity_id.get("tableId"))
-            for e in access_entries if e.entity_type == "view" and e.entity_id
+            for e in access_entries
+            if e.entity_type == "view" and e.entity_id
         }
 
         added = 0
@@ -273,8 +309,7 @@ def run_setup():
 
     logger.info("=== STEP 1: CREATE BIGQUERY CONNECTION ===")
     connection = create_connection(
-        project, location, connection_id,
-        instance_conn_name, pg_db, pg_bq_user, pg_bq_password
+        project, location, connection_id, instance_conn_name, pg_db, pg_bq_user, pg_bq_password
     )
 
     logger.info("=== STEP 1: GRANT CONNECTION SERVICE AGENT IAM ===")

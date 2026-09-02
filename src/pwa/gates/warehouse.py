@@ -9,7 +9,6 @@ import sys
 import hashlib
 import logging
 from dotenv import load_dotenv
-import pandas as pd
 from google.cloud import bigquery
 from sqlalchemy import text
 from pwa.db import get_pg_engine
@@ -75,7 +74,9 @@ def run_all_bq_gates():
     # GATE B3: raw_files.movie_keywords distinct movie_id == 1000
     try:
         sql = f"SELECT COUNT(DISTINCT movie_id) AS cnt FROM `{project}.{ds_files}.movie_keywords`"
-        cnt = list(client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=100_000_000)).result())[0]["cnt"]
+        cnt = list(client.query(sql, job_config=bigquery.QueryJobConfig(maximum_bytes_billed=100_000_000)).result())[0][
+            "cnt"
+        ]
         passed = cnt == 1000
         results.append(("GATE B3", f"{ds_files}.movie_keywords distinct ids == 1000", f"Actual: {cnt}", passed))
     except Exception as e:
@@ -132,9 +133,15 @@ def run_all_bq_gates():
         expected_views = {"v_movie", "v_movie_credits", "v_movie_full", "v_movie_keywords", "v_integrity_exceptions"}
         described_views = set(desc_df["table_name"])
         missing_views = expected_views - described_views
-        null_desc = desc_df[desc_df["option_value"].isna() | (desc_df["option_value"].str.strip() == "")]["table_name"].tolist()
+        null_desc = desc_df[desc_df["option_value"].isna() | (desc_df["option_value"].str.strip() == "")][
+            "table_name"
+        ].tolist()
         passed = len(missing_views) == 0 and len(null_desc) == 0
-        detail = f"Missing: {missing_views}" if missing_views else ("Null desc: " + str(null_desc) if null_desc else "All views described")
+        detail = (
+            f"Missing: {missing_views}"
+            if missing_views
+            else ("Null desc: " + str(null_desc) if null_desc else "All views described")
+        )
         results.append(("GATE B9", "Every mart view has description", detail, passed))
     except Exception as e:
         results.append(("GATE B9", "Every mart view has description", f"CANNOT VERIFY: {e}", False))
@@ -174,11 +181,20 @@ def run_all_bq_gates():
         sa_email = f"warehouse-agent@{project}.iam.gserviceaccount.com"
         has_viewer = False
         for entry in dataset_ref.access_entries:
-            if hasattr(entry, 'entity_id') and entry.entity_id == sa_email and entry.role and "READER" in str(entry.role).upper():
+            if (
+                hasattr(entry, "entity_id")
+                and entry.entity_id == sa_email
+                and entry.role
+                and "READER" in str(entry.role).upper()
+            ):
                 has_viewer = True
                 break
         passed = not has_viewer
-        detail = "SA has NO dataViewer on raw_registry (correct)" if passed else "SA has dataViewer on raw_registry (should not)"
+        detail = (
+            "SA has NO dataViewer on raw_registry (correct)"
+            if passed
+            else "SA has dataViewer on raw_registry (should not)"
+        )
         results.append(("GATE B12", f"Agent SA CANNOT query {ds_registry}.movie", detail, passed))
     except Exception as e:
         results.append(("GATE B12", f"Agent SA CANNOT query {ds_registry}.movie", f"CANNOT VERIFY: {e}", False))
@@ -207,7 +223,9 @@ def run_all_bq_gates():
     try:
         pg_engine, pg_type = get_pg_engine()
         if pg_type == "sqlite":
-            results.append(("GATE B14", "Federation liveness proof", "CANNOT VERIFY: PG engine is SQLite fallback", False))
+            results.append(
+                ("GATE B14", "Federation liveness proof", "CANNOT VERIFY: PG engine is SQLite fallback", False)
+            )
         else:
             baseline_cnt = _bq_count(client, f"{project}.{ds_mart}.v_movie_credits", "producer_name IS NULL")
             logger.info(f"Gate B14 baseline NULL producer_name count: {baseline_cnt}")
@@ -216,18 +234,21 @@ def run_all_bq_gates():
             target_movie_id = None
             try:
                 with pg_engine.connect() as conn:
-                    row = conn.execute(text(
-                        "SELECT movie_id, producer_name FROM movie_credits "
-                        "WHERE producer_name IS NOT NULL ORDER BY movie_id LIMIT 1"
-                    )).fetchone()
+                    row = conn.execute(
+                        text(
+                            "SELECT movie_id, producer_name FROM movie_credits "
+                            "WHERE producer_name IS NOT NULL ORDER BY movie_id LIMIT 1"
+                        )
+                    ).fetchone()
                     if row is None:
                         raise ValueError("No rows with non-null producer_name")
                     target_movie_id = row[0]
                     original_value = row[1]
 
-                    conn.execute(text(
-                        "UPDATE movie_credits SET producer_name = NULL WHERE movie_id = :mid"
-                    ), {"mid": target_movie_id})
+                    conn.execute(
+                        text("UPDATE movie_credits SET producer_name = NULL WHERE movie_id = :mid"),
+                        {"mid": target_movie_id},
+                    )
                     conn.commit()
                     logger.info(f"Gate B14: Set producer_name=NULL for movie_id={target_movie_id}")
 
@@ -236,9 +257,10 @@ def run_all_bq_gates():
                 increased = new_cnt == baseline_cnt + 1
 
                 with pg_engine.connect() as conn:
-                    conn.execute(text(
-                        "UPDATE movie_credits SET producer_name = :val WHERE movie_id = :mid"
-                    ), {"val": original_value, "mid": target_movie_id})
+                    conn.execute(
+                        text("UPDATE movie_credits SET producer_name = :val WHERE movie_id = :mid"),
+                        {"val": original_value, "mid": target_movie_id},
+                    )
                     conn.commit()
                     logger.info(f"Gate B14: Restored producer_name for movie_id={target_movie_id}")
 
@@ -253,9 +275,10 @@ def run_all_bq_gates():
                 if original_value is not None and target_movie_id is not None:
                     try:
                         with pg_engine.connect() as conn:
-                            conn.execute(text(
-                                "UPDATE movie_credits SET producer_name = :val WHERE movie_id = :mid"
-                            ), {"val": original_value, "mid": target_movie_id})
+                            conn.execute(
+                                text("UPDATE movie_credits SET producer_name = :val WHERE movie_id = :mid"),
+                                {"val": original_value, "mid": target_movie_id},
+                            )
                             conn.commit()
                     except Exception:
                         pass
@@ -281,7 +304,14 @@ def run_all_bq_gates():
         has_10 = len(proof_df) >= 10
         no_nan = not proof_df["director_name"].isna().any()
         passed = has_10 and no_nan
-        results.append(("GATE B15", "Cross-engine proof (top 10 directors)", f"Rows: {len(proof_df)}, NaN dirs: {proof_df['director_name'].isna().sum()}", passed))
+        results.append(
+            (
+                "GATE B15",
+                "Cross-engine proof (top 10 directors)",
+                f"Rows: {len(proof_df)}, NaN dirs: {proof_df['director_name'].isna().sum()}",
+                passed,
+            )
+        )
     except Exception as e:
         results.append(("GATE B15", "Cross-engine proof (top 10 directors)", f"CANNOT VERIFY: {e}", False))
 

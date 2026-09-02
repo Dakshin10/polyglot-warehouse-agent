@@ -40,14 +40,22 @@ def _split_sql_statements(sql_text):
 
 def _execute_sql_file(client, sql_path, project, label):
     """Read a SQL file, replace {PROJECT}, and execute each statement."""
-    if not os.path.exists(sql_path):
-        sql_path = os.path.join(".", "src", "pwa", "sql", "mart", os.path.basename(sql_path))
-    if not os.path.exists(sql_path):
-        logger.error(f"{label}: SQL file not found at {sql_path}")
-        sys.exit(1)
+    filename = os.path.basename(sql_path)
+    raw_sql = None
+    try:
+        from importlib.resources import files
 
-    with open(sql_path, "r", encoding="utf-8") as f:
-        raw_sql = f.read()
+        raw_sql = files("pwa.sql.mart").joinpath(filename).read_text(encoding="utf-8")
+    except Exception:
+        if not os.path.exists(sql_path):
+            sql_path = os.path.join(".", "src", "pwa", "sql", "mart", filename)
+        if os.path.exists(sql_path):
+            with open(sql_path, "r", encoding="utf-8") as f:
+                raw_sql = f.read()
+
+    if raw_sql is None:
+        logger.error(f"{label}: SQL file '{filename}' not found.")
+        sys.exit(1)
 
     sql = raw_sql.replace("{PROJECT}", project)
     statements = _split_sql_statements(sql)

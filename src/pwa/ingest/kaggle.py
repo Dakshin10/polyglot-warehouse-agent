@@ -54,6 +54,7 @@ def download_dataset():
 
     try:
         from kaggle.api.kaggle_api_extended import KaggleApi
+
         api = KaggleApi()
         api.authenticate()
         api.dataset_download_files("rounakbanik/the-movies-dataset", path=RAW_DIR, unzip=True)
@@ -61,8 +62,12 @@ def download_dataset():
     except Exception as e:
         logger.error(f"Failed to download dataset from Kaggle: {e}")
         if "403" in str(e) or "Forbidden" in str(e):
-            logger.error("Kaggle API returned HTTP 403 Forbidden. Please log in and accept the dataset terms once in your browser at: https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset")
-        logger.error("Ensure KAGGLE_USERNAME and KAGGLE_KEY are correctly set in your .env file or ~/.kaggle/kaggle.json.")
+            logger.error(
+                "Kaggle API returned HTTP 403 Forbidden. Please log in and accept the dataset terms once in your browser at: https://www.kaggle.com/datasets/rounakbanik/the-movies-dataset"
+            )
+        logger.error(
+            "Ensure KAGGLE_USERNAME and KAGGLE_KEY are correctly set in your .env file or ~/.kaggle/kaggle.json."
+        )
         sys.exit(1)
 
     if not check_raw_files_exist():

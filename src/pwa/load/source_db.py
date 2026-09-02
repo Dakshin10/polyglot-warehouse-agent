@@ -14,6 +14,7 @@ def load_data(mysql_df=None, pg_df=None):
 
     if mysql_df is None or pg_df is None:
         from pwa.transform import transform_and_select
+
         mysql_df, pg_df = transform_and_select()
 
     logger.info("Connecting to MySQL and PostgreSQL database engines via db module...")
@@ -22,11 +23,16 @@ def load_data(mysql_df=None, pg_df=None):
     pg_engine, pg_type = get_pg_engine()
 
     # 1. Execute MySQL DDL
-    mysql_ddl_path = os.path.join(".", "sql", "mysql_schema.sql")
-    if not os.path.exists(mysql_ddl_path):
-        mysql_ddl_path = os.path.join(".", "src", "pwa", "sql", "ddl", "mysql_movie.sql")
-    with open(mysql_ddl_path, "r", encoding="utf-8") as f:
-        mysql_sql = f.read()
+    try:
+        from importlib.resources import files
+
+        mysql_sql = files("pwa.sql.ddl").joinpath("mysql_movie.sql").read_text(encoding="utf-8")
+    except Exception:
+        mysql_ddl_path = os.path.join(".", "sql", "mysql_schema.sql")
+        if not os.path.exists(mysql_ddl_path):
+            mysql_ddl_path = os.path.join(".", "src", "pwa", "sql", "ddl", "mysql_movie.sql")
+        with open(mysql_ddl_path, "r", encoding="utf-8") as f:
+            mysql_sql = f.read()
 
     logger.info(f"Executing MySQL DDL script on {mysql_type.upper()} engine...")
     with mysql_engine.connect() as conn:
@@ -38,7 +44,11 @@ def load_data(mysql_df=None, pg_df=None):
             stmt = statement.strip()
             if stmt and not stmt.startswith("--") and not stmt.lower().startswith("drop table"):
                 if mysql_type == "sqlite":
-                    stmt = stmt.replace("ENGINE=InnoDB", "").replace("DEFAULT CHARSET=utf8mb4", "").replace("COLLATE=utf8mb4_unicode_ci", "")
+                    stmt = (
+                        stmt.replace("ENGINE=InnoDB", "")
+                        .replace("DEFAULT CHARSET=utf8mb4", "")
+                        .replace("COLLATE=utf8mb4_unicode_ci", "")
+                    )
                 conn.execute(text(stmt))
 
     mysql_dtypes = {
@@ -67,7 +77,7 @@ def load_data(mysql_df=None, pg_df=None):
         index=False,
         chunksize=200,
         method=insert_method,
-        dtype=mysql_dtypes
+        dtype=mysql_dtypes,
     )
 
     with mysql_engine.connect() as conn:
@@ -75,11 +85,16 @@ def load_data(mysql_df=None, pg_df=None):
         logger.info(f"{mysql_type.upper()} DB reported row count for `movie`: {res}")
 
     # 2. Execute Postgres DDL
-    pg_ddl_path = os.path.join(".", "sql", "postgres_schema.sql")
-    if not os.path.exists(pg_ddl_path):
-        pg_ddl_path = os.path.join(".", "src", "pwa", "sql", "ddl", "postgres_movie_credits.sql")
-    with open(pg_ddl_path, "r", encoding="utf-8") as f:
-        pg_sql = f.read()
+    try:
+        from importlib.resources import files
+
+        pg_sql = files("pwa.sql.ddl").joinpath("postgres_movie_credits.sql").read_text(encoding="utf-8")
+    except Exception:
+        pg_ddl_path = os.path.join(".", "sql", "postgres_schema.sql")
+        if not os.path.exists(pg_ddl_path):
+            pg_ddl_path = os.path.join(".", "src", "pwa", "sql", "ddl", "postgres_movie_credits.sql")
+        with open(pg_ddl_path, "r", encoding="utf-8") as f:
+            pg_sql = f.read()
 
     logger.info(f"Executing PostgreSQL DDL script on {pg_type.upper()} engine...")
     with pg_engine.connect() as conn:
@@ -89,7 +104,12 @@ def load_data(mysql_df=None, pg_df=None):
     with pg_engine.begin() as conn:
         for statement in pg_sql.split(";"):
             stmt = statement.strip()
-            if stmt and not stmt.startswith("--") and not stmt.startswith("COMMENT ON") and not stmt.lower().startswith("drop table"):
+            if (
+                stmt
+                and not stmt.startswith("--")
+                and not stmt.startswith("COMMENT ON")
+                and not stmt.lower().startswith("drop table")
+            ):
                 if pg_type == "sqlite":
                     stmt = stmt.replace("SERIAL PRIMARY KEY", "INTEGER PRIMARY KEY AUTOINCREMENT")
                 conn.execute(text(stmt))
@@ -116,7 +136,7 @@ def load_data(mysql_df=None, pg_df=None):
         index=False,
         chunksize=200,
         method=insert_method_pg,
-        dtype=pg_dtypes
+        dtype=pg_dtypes,
     )
 
     with pg_engine.connect() as conn:
