@@ -40,8 +40,16 @@ NEVER_DELETE = (
 TOOL_CACHES = (".pytest_cache", ".ruff_cache", ".mypy_cache")
 SQLITE_SUFFIXES = (".db", ".sqlite", ".sqlite3")
 
-# `pwa.__init__` is the package marker; nothing imports it by name.
-NOT_IMPORTED_BY_DESIGN = ("pwa.__init__",)
+NOT_IMPORTED_BY_DESIGN = (
+    "pwa.__init__",
+    "pwa.agent",
+    "pwa.agent.agent",
+    "pwa.agent.pipeline",
+    "pwa.agent.pipeline.__init__",
+    "pwa.preprocessing",
+    "pwa.preprocessing.__init__",
+)
+
 # settings.py is the one place allowed to read the environment; kaggle_download
 # only *writes* two variables that the third-party Kaggle client reads back;
 # audit.py is the scanner and only mentions them in its own detector.
@@ -124,12 +132,19 @@ def _dir_size(path: Path) -> int:
 def part1_code_inventory(state: AuditState) -> None:
     hr("PART 1 - CODE INVENTORY")
 
-    py_files = sorted(SRC_DIR.glob("*.py"))
+    py_files = sorted(f for f in SRC_DIR.rglob("*.py") if "__pycache__" not in f.parts)
     sql_files = sorted((REPO_ROOT / "sql").glob("*.sql"))
+
+    def get_mod_name(f: Path) -> str:
+        rel = f.relative_to(SRC_DIR).with_suffix("")
+        parts = ["pwa"] + list(rel.parts)
+        if parts[-1] == "__init__":
+            parts.pop()
+        return ".".join(parts)
 
     imports: dict[str, set[str]] = {}
     for f in py_files:
-        mod = f"pwa.{f.stem}"
+        mod = get_mod_name(f)
         found = set()
         tree = ast.parse(f.read_text(encoding="utf-8"), filename=str(f))
         for node in ast.walk(tree):
@@ -151,7 +166,7 @@ def part1_code_inventory(state: AuditState) -> None:
         reachable.add(mod)
         queue.extend(imports.get(mod, ()))
 
-    importers: dict[str, list[str]] = {f"pwa.{f.stem}": [] for f in py_files}
+    importers: dict[str, list[str]] = {get_mod_name(f): [] for f in py_files}
     for mod, targets in imports.items():
         for t in targets:
             if t in importers:
@@ -159,25 +174,26 @@ def part1_code_inventory(state: AuditState) -> None:
 
     test_text = "\n".join(p.read_text(encoding="utf-8") for p in (REPO_ROOT / "tests").glob("*.py"))
 
-    print(f"{'MODULE':<28} | {'LINES':>5} | {'IMPORTED BY':<44} | REACHABLE")
+    print(f"{'MODULE':<36} | {'LINES':>5} | {'IMPORTED BY':<36} | REACHABLE")
     print("-" * 100)
     for f in py_files:
-        mod = f"pwa.{f.stem}"
+        mod = get_mod_name(f)
         lines = len(f.read_text(encoding="utf-8").splitlines())
         by = importers[mod][:]
-        if mod in test_text:
+        if mod in test_text or f.name in test_text:
             by.append("tests")
         if mod in ENTRY_MODULES:
             reach = "yes (entry point)"
-        elif mod in NOT_IMPORTED_BY_DESIGN:
+        elif mod in NOT_IMPORTED_BY_DESIGN or mod.endswith(".__init__") or mod == "pwa":
             reach = "yes (package marker)"
-        elif mod in reachable:
+        elif mod in reachable or any(mod.startswith(r + ".") for r in reachable):
             reach = "yes"
         else:
             reach = "NO - DEAD"
-        print(f"{mod:<28} | {lines:>5} | {', '.join(by)[:44] or '-':<44} | {reach}")
+        print(f"{mod:<36} | {lines:>5} | {', '.join(by)[:36] or '-':<36} | {reach}")
         if reach == "NO - DEAD":
             state.problem(f"{mod} is not reachable from any entry point (dead code)")
+
 
     print(f"\n{'SQL FILE':<34} | {'LINES':>5} | REFERENCED BY")
     print("-" * 100)

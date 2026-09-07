@@ -5,6 +5,7 @@ certs/
 
 # Data Directories
 data/
+*.csv
 
 # Python Virtual Environments & Packages
 venv/
@@ -29,3 +30,6 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+
+# Schema snapshot disk cache (auto-generated, process-level speedup)
+src/pwa/agent/.schema_cache/

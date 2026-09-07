@@ -1,0 +1,302 @@
+[
+  {
+    "id": "q01",
+    "category": "aggregation",
+    "question": "what is the average budget across all movies?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q02",
+    "category": "aggregation",
+    "question": "what is the total revenue of all movies combined?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q03",
+    "category": "aggregation",
+    "question": "what is the maximum movie runtime in minutes?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q04",
+    "category": "aggregation",
+    "question": "what is the average vote rating across all movies?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q05",
+    "category": "aggregation",
+    "question": "what is the total vote count for all movies?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q06",
+    "category": "aggregation",
+    "question": "what is the minimum budget of any movie?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q07",
+    "category": "aggregation",
+    "question": "how many total movies are in the warehouse database?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q08",
+    "category": "aggregation",
+    "question": "what is the average revenue for movies directed by James Cameron?",
+    "expected_check": {"type": "answer_contains", "value": "Avatar"}
+  },
+  {
+    "id": "q09",
+    "category": "top_n",
+    "question": "which 3 movies had the highest revenue?",
+    "expected_check": {"type": "answer_contains", "value": "Avatar"}
+  },
+  {
+    "id": "q10",
+    "category": "top_n",
+    "question": "which 5 movies had the lowest revenue?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q11",
+    "category": "top_n",
+    "question": "show the top 5 highest budget movies",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q12",
+    "category": "top_n",
+    "question": "which 10 movies have the highest vote ratings?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q13",
+    "category": "top_n",
+    "question": "what are the 3 longest movies by runtime?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q14",
+    "category": "top_n",
+    "question": "which 5 directors have directed the most movies?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q15",
+    "category": "top_n",
+    "question": "which 3 movies generated the highest total profit?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q16",
+    "category": "top_n",
+    "question": "show the 5 movies with the most vote counts",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q17",
+    "category": "filtering",
+    "question": "find all movies released after 2015 with budget over $50M",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q18",
+    "category": "filtering",
+    "question": "which movies were directed by Christopher Nolan?",
+    "expected_check": {"type": "answer_contains", "value": "Inception"}
+  },
+  {
+    "id": "q19",
+    "category": "filtering",
+    "question": "list Action movies with a vote average above 8.0",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q20",
+    "category": "filtering",
+    "question": "movies released between 2000 and 2010 with revenue greater than $100M",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q21",
+    "category": "filtering",
+    "question": "which movies star Leonardo DiCaprio?",
+    "expected_check": {"type": "answer_contains", "value": "Titanic"}
+  },
+  {
+    "id": "q22",
+    "category": "filtering",
+    "question": "find movies with a runtime under 90 minutes and vote count over 100",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q23",
+    "category": "filtering",
+    "question": "movies in the Sci-Fi genre with budget over $100M",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q24",
+    "category": "filtering",
+    "question": "list movies released in 2012 directed by Joss Whedon",
+    "expected_check": {"type": "answer_contains", "value": "Avengers"}
+  },
+  {
+    "id": "q25",
+    "category": "group_by",
+    "question": "what is the average revenue by release year?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q26",
+    "category": "group_by",
+    "question": "show the number of movies released in each genre",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q27",
+    "category": "group_by",
+    "question": "what is the total revenue generated by each director?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q28",
+    "category": "group_by",
+    "question": "calculate average budget for each release year after 2010",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q29",
+    "category": "group_by",
+    "question": "what is the count of movies grouped by genre?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q30",
+    "category": "group_by",
+    "question": "show total revenue breakdown by director for top 5 directors",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q31",
+    "category": "group_by",
+    "question": "average vote rating by genre",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q32",
+    "category": "group_by",
+    "question": "movie count per release year for the last 10 years",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q33",
+    "category": "federated",
+    "question": "retrieve federated movie records from MySQL and Postgres sources",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q34",
+    "category": "federated",
+    "question": "what are the top 5 movies in the federated MySQL table by revenue?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q35",
+    "category": "federated",
+    "question": "compare budget and revenue from federated movie sources",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q36",
+    "category": "federated",
+    "question": "find federated movies with budget greater than $100M",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q37",
+    "category": "federated",
+    "question": "list federated movies released in 2009",
+    "expected_check": {"type": "answer_contains", "value": "Avatar"}
+  },
+  {
+    "id": "q38",
+    "category": "federated",
+    "question": "what is the average revenue in the federated movies view?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q39",
+    "category": "federated",
+    "question": "show 5 federated movies with the highest budget",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q40",
+    "category": "federated",
+    "question": "count total federated movie records in mart.v_federated_movies",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q41",
+    "category": "date_time",
+    "question": "how many movies came out in 2019?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q42",
+    "category": "date_time",
+    "question": "which movies were released in December 2015?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q43",
+    "category": "date_time",
+    "question": "show movies released in the 1990s",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q44",
+    "category": "date_time",
+    "question": "what is the movie count by release year between 2005 and 2015?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q45",
+    "category": "ambiguous_edge",
+    "question": "tell me about the highest grossing film of all time",
+    "expected_check": {"type": "answer_contains", "value": "Avatar"}
+  },
+  {
+    "id": "q46",
+    "category": "ambiguous_edge",
+    "question": "who directed the movie about the giant blue aliens?",
+    "expected_check": {"type": "answer_contains", "value": "Cameron"}
+  },
+  {
+    "id": "q47",
+    "category": "ambiguous_edge",
+    "question": "find movies starring Leonardo Di Caprio",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q48",
+    "category": "ambiguous_edge",
+    "question": "which movie had the biggest financial flop?",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q49",
+    "category": "ambiguous_edge",
+    "question": "movies with very high popularity rating",
+    "expected_check": {"type": "non_empty", "value": null}
+  },
+  {
+    "id": "q50",
+    "category": "ambiguous_edge",
+    "question": "what are the details for the movie Avatar?",
+    "expected_check": {"type": "answer_contains", "value": "2009"}
+  }
+]

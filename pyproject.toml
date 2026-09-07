@@ -19,7 +19,11 @@ dependencies = [
     "cloud-sql-python-connector[pg8000]",
     "google-cloud-bigquery",
     "google-cloud-bigquery-connection",
+    "google-cloud-dataplex",
+    "google-adk",
+    "sqlglot",
     "kaggle",
+    "streamlit",
 ]
 
 [project.optional-dependencies]

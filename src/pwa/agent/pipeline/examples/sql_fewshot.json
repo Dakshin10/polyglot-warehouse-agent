@@ -1,0 +1,62 @@
+[
+  {
+    "question": "Which movie had the highest revenue?",
+    "sql": "SELECT title, revenue_usd FROM `salitsteel-502008.mart.v_movie` ORDER BY revenue_usd DESC LIMIT 1"
+  },
+  {
+    "question": "List the top 5 movies by profit.",
+    "sql": "SELECT title, profit_usd, ROUND(roi, 2) AS roi FROM `salitsteel-502008.mart.v_movie` WHERE profit_usd IS NOT NULL ORDER BY profit_usd DESC LIMIT 5"
+  },
+  {
+    "question": "What is the average vote rating across all movies?",
+    "sql": "SELECT ROUND(AVG(vote_average), 2) AS avg_rating, COUNT(*) AS total_movies FROM `salitsteel-502008.mart.v_movie`"
+  },
+  {
+    "question": "How many movies are in each genre?",
+    "sql": "SELECT primary_genre, COUNT(*) AS movie_count FROM `salitsteel-502008.mart.v_movie` WHERE primary_genre IS NOT NULL GROUP BY primary_genre ORDER BY movie_count DESC LIMIT 20"
+  },
+  {
+    "question": "Which genre earned the most total revenue?",
+    "sql": "SELECT primary_genre, SUM(revenue_usd) AS total_revenue FROM `salitsteel-502008.mart.v_movie` WHERE primary_genre IS NOT NULL GROUP BY primary_genre ORDER BY total_revenue DESC LIMIT 1"
+  },
+  {
+    "question": "Who directed the most movies?",
+    "sql": "SELECT director_name, COUNT(*) AS movie_count FROM `salitsteel-502008.mart.v_movie_credits` WHERE director_name IS NOT NULL GROUP BY director_name ORDER BY movie_count DESC LIMIT 5"
+  },
+  {
+    "question": "Which director has the highest average ROI across their movies?",
+    "sql": "SELECT c.director_name, ROUND(AVG(m.roi), 2) AS avg_roi, COUNT(*) AS num_movies FROM `salitsteel-502008.mart.v_movie` m JOIN `salitsteel-502008.mart.v_movie_credits` c ON m.movie_id = c.movie_id WHERE c.director_name IS NOT NULL AND m.roi IS NOT NULL GROUP BY c.director_name HAVING COUNT(*) >= 3 ORDER BY avg_roi DESC LIMIT 10"
+  },
+  {
+    "question": "What are the top 5 movies by revenue in the Action genre?",
+    "sql": "SELECT title, revenue_usd, release_year FROM `salitsteel-502008.mart.v_movie` WHERE primary_genre = 'Action' ORDER BY revenue_usd DESC LIMIT 5"
+  },
+  {
+    "question": "Which movies were released in 2010 and had a rating above 7.5?",
+    "sql": "SELECT title, vote_average, revenue_usd FROM `salitsteel-502008.mart.v_movie` WHERE release_year = 2010 AND vote_average > 7.5 ORDER BY vote_average DESC LIMIT 20"
+  },
+  {
+    "question": "What keywords are associated with the movie Inception?",
+    "sql": "SELECT k.keyword FROM `salitsteel-502008.mart.v_movie_keywords` k JOIN `salitsteel-502008.mart.v_movie` m ON k.movie_id = m.movie_id WHERE LOWER(m.title) = 'inception' ORDER BY k.keyword LIMIT 30"
+  },
+  {
+    "question": "Which movies have the most keywords?",
+    "sql": "SELECT m.title, COUNT(k.keyword_id) AS keyword_count FROM `salitsteel-502008.mart.v_movie` m JOIN `salitsteel-502008.mart.v_movie_keywords` k ON m.movie_id = k.movie_id GROUP BY m.title ORDER BY keyword_count DESC LIMIT 10"
+  },
+  {
+    "question": "Show full details for the top 3 movies by revenue including director and lead actor.",
+    "sql": "SELECT m.title, m.release_year, m.revenue_usd, m.primary_genre, c.director_name, c.lead_actor_name FROM `salitsteel-502008.mart.v_movie_full` m JOIN `salitsteel-502008.mart.v_movie_credits` c ON m.movie_id = c.movie_id ORDER BY m.revenue_usd DESC LIMIT 3"
+  },
+  {
+    "question": "What is the average cast size by genre?",
+    "sql": "SELECT m.primary_genre, ROUND(AVG(c.cast_size), 1) AS avg_cast_size FROM `salitsteel-502008.mart.v_movie` m JOIN `salitsteel-502008.mart.v_movie_credits` c ON m.movie_id = c.movie_id WHERE m.primary_genre IS NOT NULL GROUP BY m.primary_genre ORDER BY avg_cast_size DESC LIMIT 15"
+  },
+  {
+    "question": "How many data quality exceptions exist in the mart?",
+    "sql": "SELECT COUNT(*) AS exception_count FROM `salitsteel-502008.mart.v_integrity_exceptions`"
+  },
+  {
+    "question": "Get live director credits directly from the Cloud SQL PostgreSQL database.",
+    "sql": "SELECT * FROM EXTERNAL_QUERY('salitsteel-502008.EU.movie-credits-conn', 'SELECT director_name, COUNT(*) AS cnt FROM movie_credits GROUP BY director_name ORDER BY cnt DESC LIMIT 10')"
+  }
+]

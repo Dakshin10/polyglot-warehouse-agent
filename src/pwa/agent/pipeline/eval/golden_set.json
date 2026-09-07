@@ -1,0 +1,122 @@
+[
+  {
+    "id": "G01",
+    "question": "Which movie had the highest revenue?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["Avatar", "revenue", "billion", "highest"]
+  },
+  {
+    "id": "G02",
+    "question": "What is the average vote rating across all movies?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["average", "rating", "vote"]
+  },
+  {
+    "id": "G03",
+    "question": "How many movies are in the Action genre?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["action", "movies", "genre"]
+  },
+  {
+    "id": "G04",
+    "question": "Who directed the most movies?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["director", "movies"]
+  },
+  {
+    "id": "G05",
+    "question": "Which 5 movies had the highest profit?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["profit", "revenue", "budget", "movies"]
+  },
+  {
+    "id": "G06",
+    "question": "List movies released in 2010 with a vote rating above 7.5",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["2010", "rating"]
+  },
+  {
+    "id": "G07",
+    "question": "What keywords are most commonly associated with Horror movies?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["horror", "keyword"]
+  },
+  {
+    "id": "G08",
+    "question": "Which director has the highest average ROI?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["director", "roi", "return"]
+  },
+  {
+    "id": "G09",
+    "question": "How many data integrity exceptions exist in the mart?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["exception", "integrity"]
+  },
+  {
+    "id": "G10",
+    "question": "Which genre earned the most total revenue?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["genre", "revenue", "total"]
+  },
+  {
+    "id": "G11",
+    "question": "What are the top 3 movies directed by Christopher Nolan by revenue?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["Nolan", "revenue"]
+  },
+  {
+    "id": "G12",
+    "question": "What is the average cast size for Drama movies?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["drama", "cast", "average"]
+  },
+  {
+    "id": "G13",
+    "question": "Show the lead actor for the top 5 movies by revenue",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["actor", "revenue"]
+  },
+  {
+    "id": "G14",
+    "question": "Which movies have more than 50 keywords?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["keyword"]
+  },
+  {
+    "id": "G15",
+    "question": "What was the most popular movie released in 2000?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["2000", "popular"]
+  },
+  {
+    "id": "G16",
+    "question": "What is today's stock price for Apple?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["not available", "cannot", "warehouse", "out of scope"]
+  },
+  {
+    "id": "G17",
+    "question": "List movies from the Comedy genre released between 2005 and 2010",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["comedy", "2005", "2010"]
+  },
+  {
+    "id": "G18",
+    "question": "What is the total number of movies in the mart?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["movies", "total", "count"]
+  },
+  {
+    "id": "G19",
+    "question": "Which movies have both 'alien' and 'space' as keywords?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["alien", "space"]
+  },
+  {
+    "id": "G20",
+    "question": "What is the highest budget movie in the mart?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["budget", "highest", "million"]
+  }
+]

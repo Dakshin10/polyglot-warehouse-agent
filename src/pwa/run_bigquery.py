@@ -2,11 +2,9 @@
 
 import logging
 
-from pwa.bigquery_load_csv import load_csvs
-from pwa.bigquery_mart import build_mart
-from pwa.bigquery_replicate import replicate_mysql
-from pwa.bigquery_setup import run_setup
 from pwa.gates_bigquery import run_all_bq_gates
+from pwa.preprocessing import build_mart, load_csvs, replicate_mysql, run_setup
+
 
 logger = logging.getLogger("pwa.run_bigquery")
 

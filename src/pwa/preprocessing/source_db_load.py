@@ -14,7 +14,7 @@ def load_data(mysql_df=None, pg_df=None):
     settings = get_settings()
 
     if mysql_df is None or pg_df is None:
-        from pwa.movie_transform import transform_and_select
+        from pwa.preprocessing.movie_transform import transform_and_select
 
         mysql_df, pg_df = transform_and_select()
 

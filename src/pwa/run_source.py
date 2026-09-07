@@ -3,9 +3,8 @@
 import logging
 
 from pwa.gates_source import run_all_gates
-from pwa.kaggle_download import download_dataset
-from pwa.movie_transform import transform_and_select
-from pwa.source_db_load import load_data
+from pwa.preprocessing import download_dataset, load_data, transform_and_select
+
 
 logger = logging.getLogger("pwa.run_source")
 

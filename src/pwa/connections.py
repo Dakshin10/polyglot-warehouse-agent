@@ -15,6 +15,13 @@ from pwa.settings import get_settings
 
 logger = logging.getLogger("pwa.connections")
 
+# ---------------------------------------------------------------------------
+# BigQuery client singleton — instantiated once per process and reused.
+# Eliminates repeated ADC/project/location initialisation overhead on every
+# pipeline step call.
+# ---------------------------------------------------------------------------
+_BQ_CLIENT: bigquery.Client | None = None
+
 
 def mask_credentials(text_msg: str) -> str:
     """Mask passwords in DSN URLs and error text before it reaches a log or a traceback."""
@@ -33,11 +40,15 @@ def get_mysql_engine():
     dbname = settings.mysql_db
     encoded_pwd = quote_plus(settings.mysql_password) if settings.mysql_password else ""
 
-    # settings validation guarantees the CA file exists and is non-empty.
-    connect_args = {"connect_timeout": 45, "ssl": {"ca": str(settings.mysql_ssl_ca)}}
+    # Use CA file if non-placeholder, otherwise fallback to ssl_mode REQUIRED for PyMySQL
+    if settings.mysql_ssl_ca and settings.mysql_ssl_ca.is_file() and settings.mysql_ssl_ca.stat().st_size > 100:
+        connect_args = {"connect_timeout": 45, "ssl": {"ca": str(settings.mysql_ssl_ca)}}
+    else:
+        connect_args = {"connect_timeout": 45, "ssl": {"ssl_mode": "REQUIRED"}}
 
     db_uri = f"mysql+pymysql://{user}:{encoded_pwd}@{host}:{port}/{dbname}?charset=utf8mb4"
     root_uri = f"mysql+pymysql://{user}:{encoded_pwd}@{host}:{port}/defaultdb?charset=utf8mb4"
+
 
     try:
         root_engine = create_engine(root_uri, connect_args=connect_args, pool_pre_ping=True)
@@ -135,9 +146,38 @@ def get_pg_engine():
 
 
 def get_bq_client(project: str = "", location: str = "") -> bigquery.Client:
-    """Create a BigQuery client for the configured project and location."""
-    settings = get_settings()
-    return bigquery.Client(
-        project=project or settings.gcp_project,
-        location=location or settings.bq_location,
-    )
+    """Return a process-level singleton BigQuery client.
+
+    The first call builds the client; subsequent calls return the same
+    instance, avoiding repeated ADC resolution and gRPC channel setup
+    (which was contributing ~1-2s to each pipeline step).
+
+    Pass explicit `project`/`location` only when you deliberately need
+    a different project — doing so bypasses the singleton.
+    """
+    global _BQ_CLIENT
+    if project or location:
+        # Caller explicitly wants a specific project/location — don't cache this.
+        try:
+            settings = get_settings()
+            gcp_project = project or settings.gcp_project
+            bq_location = location or settings.bq_location
+        except Exception:
+            import os
+            gcp_project = project or os.getenv("GCP_PROJECT", "salitsteel-502008")
+            bq_location = location or os.getenv("BQ_LOCATION", "EU")
+        return bigquery.Client(project=gcp_project, location=bq_location)
+
+    if _BQ_CLIENT is None:
+        try:
+            settings = get_settings()
+            gcp_project = settings.gcp_project
+            bq_location = settings.bq_location
+        except Exception:
+            import os
+            gcp_project = os.getenv("GCP_PROJECT", "salitsteel-502008")
+            bq_location = os.getenv("BQ_LOCATION", "EU")
+        logger.debug("[BQ Client] Initialising singleton BigQuery client.")
+        _BQ_CLIENT = bigquery.Client(project=gcp_project, location=bq_location)
+
+    return _BQ_CLIENT

@@ -3,7 +3,7 @@ import logging
 
 from google.cloud import bigquery
 
-from pwa.bigquery_setup import authorize_mart_views
+from pwa.preprocessing.bigquery_setup import authorize_mart_views
 from pwa.connections import get_bq_client
 from pwa.settings import get_settings
 from pwa.sql_files import read_sql_file, sql_file_path
