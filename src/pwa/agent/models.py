@@ -4,23 +4,23 @@ import logging
 import os
 from typing import Any, Union
 
-from google.adk.models.lite_llm import LiteLlm
-
 logger = logging.getLogger("pwa.agent.models")
 
 GEMINI_MODEL_ID = "gemini-2.5-flash"
 GROQ_MODEL_ID = "groq/llama-3.3-70b-versatile"
 
 # Global lazy registries for model instances
-_GROQ_MODEL_INSTANCES: dict[str, LiteLlm] = {}
+_GROQ_MODEL_INSTANCES: dict[str, Any] = {}
 _GEMINI_MODEL_INSTANCES: dict[str, Any] = {}
 
 
-def get_groq_model(model_name: str = GROQ_MODEL_ID) -> LiteLlm:
+def get_groq_model(model_name: str = GROQ_MODEL_ID) -> Any:
     """Get or create LiteLlm instance for Groq."""
     global _GROQ_MODEL_INSTANCES
     if model_name not in _GROQ_MODEL_INSTANCES:
         logger.debug(f"Initializing LiteLlm model instance for Groq: model='{model_name}'")
+        from google.adk.models.lite_llm import LiteLlm
+
         _GROQ_MODEL_INSTANCES[model_name] = LiteLlm(model=model_name)
     return _GROQ_MODEL_INSTANCES[model_name]
 

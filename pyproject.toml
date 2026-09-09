@@ -20,7 +20,9 @@ dependencies = [
     "google-cloud-bigquery",
     "google-cloud-bigquery-connection",
     "google-cloud-dataplex",
-    "google-adk",
+    "google-adk[extensions]",
+    "litellm",
+    "fpdf2",
     "sqlglot",
     "kaggle",
     "streamlit",
@@ -41,6 +43,7 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 markers = [
     "integration: mark test as requiring live cloud credentials (skipped by default)",
 ]
