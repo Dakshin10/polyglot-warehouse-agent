@@ -55,7 +55,11 @@ def validate_mart_table(table_name: str) -> str:
 
 def get_mart_credentials_config() -> BigQueryCredentialsConfig:
     """Create ADK BigQueryCredentialsConfig using ADC matching PWA auth path."""
-    credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/bigquery"])
+    try:
+        credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/bigquery"])
+    except Exception as err:
+        logger.warning(f"Could not load Google default credentials: {err}")
+        credentials = None
     return BigQueryCredentialsConfig(credentials=credentials)
 
 

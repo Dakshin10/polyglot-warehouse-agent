@@ -4,10 +4,13 @@ Run locally:
     streamlit run app.py
 """
 
+from __future__ import annotations
+
 import os
 import pathlib
 import sys
 import time
+from typing import Any
 
 # Ensure src/ directory is in Python path for pwa imports
 _ROOT_DIR = pathlib.Path(__file__).parent.resolve()
@@ -35,6 +38,7 @@ try:
 except Exception as _import_exc:
     _REAL_ORCHESTRATOR_AVAILABLE = False
     _IMPORT_ERROR = str(_import_exc)
+    PipelineResult = Any  # type: ignore[misc, assignment]
 
 
 def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResult:
