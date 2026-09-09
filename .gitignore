@@ -33,3 +33,8 @@ __pycache__/
 
 # Schema snapshot disk cache (auto-generated, process-level speedup)
 src/pwa/agent/.schema_cache/
+
+
+.agents/
+.claude/
+.streamlit/

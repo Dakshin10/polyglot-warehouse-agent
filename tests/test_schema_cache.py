@@ -118,3 +118,23 @@ class TestEnvTTL:
             time.sleep(0.1)
             sc.get_schema_snapshot()  # should re-fetch after 0.05s TTL
             assert mock_fetch.call_count == 2
+
+
+class TestCardinalityAnnotations:
+    def test_cardinality_mappings_exist(self):
+        """All mart views must have explicit cardinality annotations."""
+        expected_views = [
+            "mart.v_movie",
+            "mart.v_movie_credits",
+            "mart.v_movie_keywords",
+            "mart.v_movie_full",
+            "mart.v_integrity_exceptions",
+        ]
+        for v in expected_views:
+            assert v in sc.MART_CARDINALITIES
+            assert sc.get_view_cardinality(v) != "unknown"
+
+    def test_keywords_cardinality_is_one_to_many(self):
+        card = sc.get_view_cardinality("mart.v_movie_keywords")
+        assert "one-to-many" in card
+

@@ -11,7 +11,10 @@ from google.genai import types
 
 from pwa.agent.models import get_agent_model, get_model_for_stage
 from pwa.agent.root_agent import _init_env
-from pwa.agent.schema_cache import get_schema_snapshot as cached_schema_snapshot
+from pwa.agent.schema_cache import (
+    get_schema_snapshot as cached_schema_snapshot,
+    get_view_cardinality,
+)
 
 logger = logging.getLogger("pwa.agent.pipeline.schema_agent")
 
@@ -45,8 +48,9 @@ def build_schema_agent(model: Any = None) -> Agent:
         snapshot = cached_schema_snapshot()
         schema_lines = []
         for view_name, cols in snapshot.items():
+            cardinality = get_view_cardinality(view_name)
             col_strs = [f"  - {c['name']} ({c['type']}): {c['description']}" for c in cols]
-            schema_lines.append(f"View `{view_name}`:\n" + "\n".join(col_strs))
+            schema_lines.append(f"View `{view_name}` (Cardinality: {cardinality}):\n" + "\n".join(col_strs))
         full_schema = "\n\n".join(schema_lines)
     except Exception as e:
         logger.warning(f"Could not fetch schema snapshot: {e}")

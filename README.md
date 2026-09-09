@@ -202,3 +202,10 @@ streamlit run app.py
 >> # MySQL ROI x PostgreSQL director — with budget guard
 >> pwa query "Which director has the highest average ROI across their movies?"
 >> 
+
+Supported phrasings (all hit the fast-path, zero LLM calls):
+
+"What is the average ROI by genre?"
+"Which genre is the most profitable on average?"
+"What is the average return on investment per genre?"
+"Show me genre performance by average ROI"

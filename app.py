@@ -24,6 +24,7 @@ from pwa.ui.components.stage_tracker import (  # noqa: E402
     render_pipeline_trace_expander,
     render_thinking_status,
 )
+from pwa.ui.components.report_view import render_report_view  # noqa: E402
 from pwa.ui.styles import apply_custom_styles  # noqa: E402
 
 # Try importing real orchestrator
@@ -62,6 +63,26 @@ def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResul
         bytes_scanned=2147483648,
         stage_latencies={"schema": 0.42, "sql": 0.65, "exec": 0.38, "answer": 0.35},
         row_count=3,
+        viz_recommendation={
+            "primary": {
+                "type": "bar",
+                "x_col": "title",
+                "y_col": "revenue",
+                "reason": "3 movies ranked by revenue — a bar chart makes the ordering immediately scannable.",
+            },
+            "alternatives": [
+                {"type": "table", "x_col": None, "y_col": None,
+                 "reason": "Table view shows all columns and exact revenue figures."},
+            ],
+        },
+        executed_at="2026-09-09T07:20:00Z",
+        guardrails_applied=[
+            {"name": "AST Read-Only Guard", "description": "Enforced AST SELECT-only validation", "rule": "AST-SELECT"},
+            {"name": "Dry-Run Cost Guard", "description": "Verified estimated scan cost within limits", "rule": "Cost-Limit"},
+        ],
+        data_provenance=[
+            {"table_name": "mart.v_movie", "type": "base_mart_view", "description": "Base movie view", "last_refreshed": "Live transactional data"}
+        ],
     )
 
 
@@ -83,8 +104,19 @@ def _render_user_turn(content: str) -> None:
     )
 
 
-def _render_assistant_result(result: str | PipelineResult | dict) -> None:
-    """Helper to render avatar, answer text, pipeline trace expander, and evidence expanders inside assistant turn."""
+def _render_assistant_result(
+    result: str | PipelineResult | dict,
+    question: str = "",
+    msg_idx: int = 0,
+) -> None:
+    """Render avatar, answer text, pipeline trace, and evidence expanders for one turn.
+
+    Args:
+        result:   PipelineResult, dict, or plain rejection string.
+        question: Original question — forwarded to viz_panel for keyword heuristics.
+        msg_idx:  Stable index from enumerate(messages); keys session_state for
+                  the alternative chart button state of this specific turn.
+    """
     _render_assistant_avatar()
 
     if isinstance(result, str):
@@ -100,8 +132,8 @@ def _render_assistant_result(result: str | PipelineResult | dict) -> None:
     # Collapsible pipeline trace expander
     render_pipeline_trace_expander(stage_latencies)
 
-    # Nested evidence expanders (SQL, results dataframe, run details)
-    render_evidence_panel(result)
+    # Viz panel (chart + reason caption + alternative buttons) + SQL + raw table + run details + generate report button
+    render_evidence_panel(result, question=question, msg_idx=msg_idx)
 
 
 def main() -> None:
@@ -119,22 +151,33 @@ def main() -> None:
     # Render Minimal Header (small top-left wordmark)
     render_header()
 
-    # Session State Conversation Thread Initialization
+    # Session State Initialization
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "active_view" not in st.session_state:
+        st.session_state.active_view = "chat"
+
+    # View Router: Report View Mode vs Chat Thread Mode
+    if st.session_state.active_view == "report" and st.session_state.get("active_report"):
+        render_report_view(st.session_state.active_report)
+        return
+
 
     # 1. Render Chat Thread Scrollback
-    for msg in st.session_state.messages:
+    for msg_idx, msg in enumerate(st.session_state.messages):
         role = msg.get("role")
         content = msg.get("content", "")
         result = msg.get("result")
+        # Recover the original question so the viz panel can re-apply keyword
+        # heuristics and restore the correct button state during scrollback.
+        original_question = msg.get("question", "")
 
         if role == "user":
             with st.chat_message("user", avatar=None):
                 _render_user_turn(content)
         elif role == "assistant":
             with st.chat_message("assistant", avatar=None):
-                _render_assistant_result(result or content)
+                _render_assistant_result(result or content, question=original_question, msg_idx=msg_idx)
 
     # 2. Pinned Bottom Composer
     if prompt := st.chat_input("Ask a question about warehouse data…"):
@@ -160,17 +203,29 @@ def main() -> None:
             except Exception as exc:
                 res = f"Pipeline Error: {exc}"
 
+            # Active assistant turn: msg_idx = current length of messages (the slot
+            # this turn will occupy once appended).  Session state for button clicks
+            # is written here and then re-read during the next scrollback render pass.
+            active_msg_idx = len(st.session_state.messages)
+
             thinking_placeholder.empty()
 
-            # Render final answer and nested evidence
-            _render_assistant_result(res)
+            # Render final answer and evidence (with question + stable idx for viz panel)
+            _render_assistant_result(res, question=prompt, msg_idx=active_msg_idx)
 
-            # Store in session thread state
+            # Store in session thread state (persist question + viz_recommendation for scrollback)
             content_str = res if isinstance(res, str) else getattr(res, "answer", str(res))
+            viz_rec = None
+            if not isinstance(res, str):
+                viz_rec = getattr(res, "viz_recommendation", None) or (
+                    res.get("viz_recommendation") if isinstance(res, dict) else None
+                )
             st.session_state.messages.append({
                 "role": "assistant",
                 "content": content_str,
                 "result": res,
+                "question": prompt,
+                "viz_recommendation": viz_rec,
             })
 
         st.rerun()

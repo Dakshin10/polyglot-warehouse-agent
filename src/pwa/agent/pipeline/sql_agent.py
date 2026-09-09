@@ -69,6 +69,7 @@ Your job is to generate ONE valid BigQuery SQL query to answer the user's questi
 4. ALLOWED VIEWS ONLY: Only query views in the `mart` dataset: `mart.v_movie`, `mart.v_movie_credits`, `mart.v_movie_keywords`, `mart.v_movie_full`, `mart.v_integrity_exceptions`.
 5. RAW SQL ONLY: Return ONLY the raw SQL query string. Do NOT wrap in ```sql ``` code blocks or add extra explanation text.
 6. ROI GUARD: Any query that filters, sorts, or aggregates on `roi` MUST include `WHERE budget_usd > 1000` (or equivalent in a JOIN/subquery) to exclude movies with missing or near-zero budgets that produce astronomically inflated ROI values.
+7. ONE-TO-MANY AGGREGATION GUARD: If the question requires filtering or grouping by a one-to-many-related column (such as keywords in `mart.v_movie_keywords`) AND also computing an aggregate (AVG, SUM, COUNT) over movie-level numeric columns (revenue, budget, ROI), you MUST pre-aggregate or filter the one-to-many side first (e.g., using `EXISTS`, `IN (SELECT movie_id FROM mart.v_movie_keywords WHERE ...)` or a subquery) before computing the movie-level aggregate. NEVER perform a raw JOIN against a 1-to-many table before averaging or summing movie metrics, as that double-counts rows and produces incorrect results.
 {fewshot_block}"""
 
 

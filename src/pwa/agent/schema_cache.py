@@ -61,6 +61,26 @@ def _cache_file(project_id: str, dataset: str) -> pathlib.Path:
 
 
 # ---------------------------------------------------------------------------
+# Relationship Cardinalities relative to v_movie
+# ---------------------------------------------------------------------------
+MART_CARDINALITIES: dict[str, str] = {
+    "mart.v_movie": "base (1 row per movie)",
+    "mart.v_movie_credits": "one-to-one (safe to pre-join, row count stays 1:1)",
+    "mart.v_movie_keywords": "one-to-many (JOIN only for keyword filtering; NEVER join before an aggregate like AVG/SUM over movie-level columns, or wrap the join in a pre-aggregation subquery first)",
+    "mart.v_movie_full": "pre-joined 1:1 view, safe for direct lookups",
+    "mart.v_integrity_exceptions": "monitor (exceptions listing)",
+}
+
+
+def get_view_cardinality(view_name: str) -> str:
+    """Return the relationship cardinality description relative to v_movie."""
+    clean = view_name.strip().strip("`").lower()
+    if not clean.startswith("mart."):
+        clean = f"mart.{clean}"
+    return MART_CARDINALITIES.get(clean, "unknown")
+
+
+# ---------------------------------------------------------------------------
 # Static schema — used as immediate fallback when live fetch fails.
 # Keep in sync with your actual mart views.
 # ---------------------------------------------------------------------------

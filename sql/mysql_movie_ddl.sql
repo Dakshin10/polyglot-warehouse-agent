@@ -20,3 +20,4 @@ CREATE TABLE movie (
     popularity DECIMAL(10,4),
     PRIMARY KEY (movie_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    

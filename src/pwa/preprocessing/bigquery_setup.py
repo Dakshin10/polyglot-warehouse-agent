@@ -202,24 +202,26 @@ def setup_warehouse_agent_sa(project):
         logger.warning(f"IAM binding warning: {e.stderr}")
 
     try:
-        subprocess.run(
-            [
-                "bq",
-                "add-iam-policy-binding",
-                f"--member=serviceAccount:{sa_email}",
-                "--role=roles/bigquery.dataViewer",
-                f"{project}:{ds_mart}",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            shell=True,
+        client = get_bq_client()
+        dataset_ref = client.get_dataset(f"{project}.{ds_mart}")
+        access_entries = list(dataset_ref.access_entries)
+        exists = any(
+            e.role == "roles/bigquery.dataViewer" and e.entity_id == sa_email
+            for e in access_entries
         )
+        if not exists:
+            access_entries.append(
+                bigquery.AccessEntry(
+                    role="roles/bigquery.dataViewer",
+                    entity_type="userByEmail",
+                    entity_id=sa_email,
+                )
+            )
+            dataset_ref.access_entries = access_entries
+            client.update_dataset(dataset_ref, ["access_entries"])
         logger.info(f"Granted roles/bigquery.dataViewer on {ds_mart} to {sa_email}")
-    except subprocess.CalledProcessError as e:
-        logger.warning(f"Dataset IAM binding warning: {e.stderr}")
-    except FileNotFoundError:
-        logger.warning("bq CLI not found. Please grant dataViewer on mart manually.")
+    except Exception as e:
+        logger.warning(f"Dataset IAM binding warning: {e}")
 
     return sa_email
 

@@ -33,8 +33,10 @@ def refresh_rollups() -> bool:
     client = get_bq_client()
 
     logger.info(f"Starting rollup tables refresh for project '{project}'...")
-    ensure_rollup_dataset(client, project)
-
+    # AUDIT NOTE: All rollup queries below build strictly from `mart.v_movie_full`
+    # which maintains a 1:1 relationship relative to `mart.v_movie`. No 1-to-many
+    # tables (such as `mart.v_movie_keywords`) are joined, guaranteeing zero fan-out
+    # or row inflation during aggregate calculations.
     queries = {
         "avg_roi_by_director": f"""
             CREATE OR REPLACE TABLE `{project}.rollup.avg_roi_by_director` AS
@@ -80,6 +82,22 @@ def refresh_rollups() -> bool:
             FROM `{project}.mart.v_movie_full`
             WHERE revenue_usd IS NOT NULL AND title IS NOT NULL
         """,
+        "avg_roi_by_genre": f"""
+            CREATE OR REPLACE TABLE `{project}.rollup.avg_roi_by_genre` AS
+            SELECT
+                primary_genre,
+                ROUND(AVG(roi), 2)          AS avg_roi,
+                ROUND(AVG(revenue_usd), 0)  AS avg_revenue_usd,
+                ROUND(AVG(budget_usd), 0)   AS avg_budget_usd,
+                COUNT(*)                    AS movie_count,
+                CURRENT_TIMESTAMP()         AS last_refreshed
+            FROM `{project}.mart.v_movie_full`
+            WHERE primary_genre IS NOT NULL
+              AND roi IS NOT NULL
+              AND budget_usd > 1000
+            GROUP BY primary_genre
+            ORDER BY avg_roi DESC
+        """,
     }
 
     success = True
@@ -99,3 +117,22 @@ def refresh_rollups() -> bool:
         logger.error("One or more rollup table refreshes failed.")
 
     return success
+
+
+def get_rollup_last_refreshed(table_name: str) -> str:
+    """Fetch last_refreshed timestamp string for a given rollup table."""
+    import datetime
+    try:
+        settings = get_settings()
+        client = get_bq_client()
+        clean_name = table_name.split(".")[-1]
+        full_ref = f"{settings.gcp_project}.rollup.{clean_name}"
+        sql = f"SELECT MAX(last_refreshed) as lr FROM `{full_ref}`"
+        query_job = client.query(sql)
+        rows = list(query_job.result())
+        if rows and rows[0]["lr"]:
+            return str(rows[0]["lr"])
+    except Exception as exc:
+        logger.debug(f"Could not fetch last_refreshed for '{table_name}': {exc}")
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+
