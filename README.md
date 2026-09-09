@@ -14,7 +14,7 @@
 
 ## 📐 System Architecture & Workflow
 
-![Polyglot Warehouse Architecture & Pipeline Flow](flow/image.png)
+![Polyglot Warehouse Architecture & Pipeline Flow](assets/workflow.png)
 
 ---
 
@@ -104,47 +104,8 @@ pwa query --model groq --verbose "What is the average cast size for movies over 
 
 ## 🏛️ Multi-Agent Pipeline Topology
 
-```
-                  ┌─────────────────────────────────────────────────────────┐
-                  │                 User Natural Language Question          │
-                  └────────────────────────────┬────────────────────────────┘
-                                               │
-                                               ▼
-                  ┌─────────────────────────────────────────────────────────┐
-                  │  Template Router (0 LLM Calls / Instant Rollup Path)    │
-                  └──────────────┬───────────────────────────┬──────────────┘
-                    Matched      │                           │ Fallthrough
-                                 ▼                           ▼
-                  ┌────────────────────────┐   ┌───────────────────────────┐
-                  │ Pre-Materialized       │   │ 1. SchemaGroundingAgent   │
-                  │ BigQuery Rollups       │   │    (Selects Mart Views)   │
-                  └──────────────┬─────────┘   └─────────────┬─────────────┘
-                                 │                           │
-                                 │                           ▼
-                                 │             ┌───────────────────────────┐
-                                 │             │ 2. SqlGenerationAgent     │
-                                 │             │    (Generates SELECT SQL)  │
-                                 │             └─────────────┬─────────────┘
-                                 │                           │
-                                 │                           ▼
-                                 │             ┌───────────────────────────┐
-                                 │             │ 3. ValidationExecution    │
-                                 │             │    (AST Check & Dry-Run)  │
-                                 │             └─────────────┬─────────────┘
-                                 │                           │
-                                 │                           ▼
-                                 │             ┌───────────────────────────┐
-                                 │             │ 4. AnswerSynthesisAgent   │
-                                 │             │    (Formulates Response)  │
-                                 │             └─────────────┬─────────────┘
-                                 │                           │
-                                 └─────────────┬─────────────┘
-                                               │
-                                               ▼
-                  ┌─────────────────────────────────────────────────────────┐
-                  │    Visualization Router & Deliverable UI Render        │
-                  └─────────────────────────────────────────────────────────┘
-```
+![Multi-Agent Pipeline Topology](assets/multiagent_pipeline.png)
+
 
 1. **`SchemaGroundingAgent`** (`schema_agent.py`): Maps natural language questions to `INFORMATION_SCHEMA` metadata, selecting only required mart views and columns.
 2. **`SqlGenerationAgent`** (`sql_agent.py`): Produces standard BigQuery `SELECT` queries with enforced column selection and strict `LIMIT` bounds.
