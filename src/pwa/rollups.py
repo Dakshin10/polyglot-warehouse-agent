@@ -122,6 +122,7 @@ def refresh_rollups() -> bool:
 def get_rollup_last_refreshed(table_name: str) -> str:
     """Fetch last_refreshed timestamp string for a given rollup table."""
     import datetime
+
     try:
         settings = get_settings()
         client = get_bq_client()
@@ -135,4 +136,3 @@ def get_rollup_last_refreshed(table_name: str) -> str:
     except Exception as exc:
         logger.debug(f"Could not fetch last_refreshed for '{table_name}': {exc}")
     return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-

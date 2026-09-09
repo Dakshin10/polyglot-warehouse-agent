@@ -58,10 +58,24 @@ def parse_top_n(text: str, default: int = 5) -> int:
 
 
 _YEAR_PATTERN = re.compile(r"\b(19\d\d|20\d\d)\b")
-_TEMPORAL_KEYWORDS = frozenset({
-    "year", "years", "yr", "yrs", "decade", "decades", "century", "centuries",
-    "since", "recently", "lately", "over time", "yoy", "year over year",
-})
+_TEMPORAL_KEYWORDS = frozenset(
+    {
+        "year",
+        "years",
+        "yr",
+        "yrs",
+        "decade",
+        "decades",
+        "century",
+        "centuries",
+        "since",
+        "recently",
+        "lately",
+        "over time",
+        "yoy",
+        "year over year",
+    }
+)
 _TEMPORAL_RANGE_PATTERN = re.compile(r"\b(from|between|after|before|during)\s+(19\d\d|20\d\d|\d{4})\b", re.IGNORECASE)
 
 
@@ -94,7 +108,11 @@ def match_template(question: str) -> Optional[dict[str, Any]]:
         return None
 
     # 1. Director with Highest Average ROI
-    if ("director" in q_lower or "directed" in q_lower) and "roi" in q_lower and ("highest" in q_lower or "average" in q_lower or "top" in q_lower):
+    if (
+        ("director" in q_lower or "directed" in q_lower)
+        and "roi" in q_lower
+        and ("highest" in q_lower or "average" in q_lower or "top" in q_lower)
+    ):
         return {
             "template_name": "avg_roi_by_director",
             "description": "Find director with highest average ROI across movies",
@@ -107,12 +125,20 @@ def match_template(question: str) -> Optional[dict[str, Any]]:
                     "rule": "Rule 6",
                 }
             ],
-            "sql_generator": lambda project, params: f"""SELECT director_name, avg_roi, movie_count FROM `{project}.rollup.avg_roi_by_director` ORDER BY avg_roi DESC LIMIT {params['limit']}""",
-            "formatter": lambda rows, params: f"The director with the highest average ROI across their movies is {rows[0]['director_name']}, with an average ROI of {rows[0]['avg_roi']:,.2f} across {rows[0]['movie_count']} movies." if rows else "No director data found in rollup table."
+            "sql_generator": lambda project, params: (
+                f"""SELECT director_name, avg_roi, movie_count FROM `{project}.rollup.avg_roi_by_director` ORDER BY avg_roi DESC LIMIT {params["limit"]}"""
+            ),
+            "formatter": lambda rows, params: (
+                f"The director with the highest average ROI across their movies is {rows[0]['director_name']}, with an average ROI of {rows[0]['avg_roi']:,.2f} across {rows[0]['movie_count']} movies."
+                if rows
+                else "No director data found in rollup table."
+            ),
         }
 
     # 2. Average Cast Size by Revenue Threshold
-    if "cast size" in q_lower and ("revenue" in q_lower or "gross" in q_lower or "over" in q_lower or "above" in q_lower or "$" in q_lower):
+    if "cast size" in q_lower and (
+        "revenue" in q_lower or "gross" in q_lower or "over" in q_lower or "above" in q_lower or "$" in q_lower
+    ):
         threshold = parse_revenue_threshold(q_lower) or 500_000_000
         return {
             "template_name": "avg_cast_size_by_revenue_threshold",
@@ -126,14 +152,19 @@ def match_template(question: str) -> Optional[dict[str, Any]]:
                     "rule": "Threshold-Filter",
                 }
             ],
-            "sql_generator": lambda project, params: f"""SELECT revenue_threshold, avg_cast_size, movie_count FROM `{project}.rollup.avg_cast_size_by_revenue_threshold` WHERE revenue_threshold = {params['threshold']}""",
-            "formatter": lambda rows, params: f"For movies with over ${params['threshold'] / 1_000_000:,.0f}M in revenue, the average cast size is {rows[0]['avg_cast_size']} across {rows[0]['movie_count']} movies." if rows else f"No data found for revenue threshold ${params['threshold']:,.0f}."
+            "sql_generator": lambda project, params: (
+                f"""SELECT revenue_threshold, avg_cast_size, movie_count FROM `{project}.rollup.avg_cast_size_by_revenue_threshold` WHERE revenue_threshold = {params["threshold"]}"""
+            ),
+            "formatter": lambda rows, params: (
+                f"For movies with over ${params['threshold'] / 1_000_000:,.0f}M in revenue, the average cast size is {rows[0]['avg_cast_size']} across {rows[0]['movie_count']} movies."
+                if rows
+                else f"No data found for revenue threshold ${params['threshold']:,.0f}."
+            ),
         }
 
     # 3. Top Grossing Movies (only overall top N of all time)
-    if (
-        ("grossing" in q_lower or "highest revenue" in q_lower or "top revenue" in q_lower)
-        and ("movie" in q_lower or "film" in q_lower or "top" in q_lower)
+    if ("grossing" in q_lower or "highest revenue" in q_lower or "top revenue" in q_lower) and (
+        "movie" in q_lower or "film" in q_lower or "top" in q_lower
     ):
         limit = parse_top_n(q_lower, default=5)
         return {
@@ -148,15 +179,33 @@ def match_template(question: str) -> Optional[dict[str, Any]]:
                     "rule": "Rank-Limit",
                 }
             ],
-            "sql_generator": lambda project, params: f"""SELECT rank, title, revenue, director_name FROM `{project}.rollup.top_grossing_movies` WHERE rank <= {params['limit']} ORDER BY rank ASC""",
-            "formatter": lambda rows, params: "The top highest-grossing movies are:\n" + "\n".join([f"{r['rank']}. {r['title']} — ${r['revenue'] / 1_000_000:,.1f}M (Director: {r.get('director_name') or 'Unknown'})" for r in rows]) if rows else "No top grossing movies found."
+            "sql_generator": lambda project, params: (
+                f"""SELECT rank, title, revenue, director_name FROM `{project}.rollup.top_grossing_movies` WHERE rank <= {params["limit"]} ORDER BY rank ASC"""
+            ),
+            "formatter": lambda rows, params: (
+                "The top highest-grossing movies are:\n"
+                + "\n".join(
+                    [
+                        f"{r['rank']}. {r['title']} — ${r['revenue'] / 1_000_000:,.1f}M (Director: {r.get('director_name') or 'Unknown'})"
+                        for r in rows
+                    ]
+                )
+                if rows
+                else "No top grossing movies found."
+            ),
         }
 
     # 4. Average ROI by Genre (cross-engine: MySQL financials × PostgreSQL cast)
     if (
         ("genre" in q_lower or "genres" in q_lower)
         and ("roi" in q_lower or "return" in q_lower or "performance" in q_lower or "profitable" in q_lower)
-        and ("average" in q_lower or "avg" in q_lower or "by genre" in q_lower or "per genre" in q_lower or "each genre" in q_lower)
+        and (
+            "average" in q_lower
+            or "avg" in q_lower
+            or "by genre" in q_lower
+            or "per genre" in q_lower
+            or "each genre" in q_lower
+        )
     ):
         return {
             "template_name": "avg_roi_by_genre",
@@ -176,13 +225,17 @@ def match_template(question: str) -> Optional[dict[str, Any]]:
                 f"ORDER BY avg_roi DESC"
             ),
             "formatter": lambda rows, params: (
-                "Average ROI by genre (cross-engine: MySQL financials × PostgreSQL cast data):\n"
-                + "\n".join(
-                    f"  {r['primary_genre']}: {r['avg_roi']:,.2f}x ROI "
-                    f"({r['movie_count']} movies, avg revenue ${r['avg_revenue_usd'] / 1_000_000:,.1f}M)"
-                    for r in rows
+                (
+                    "Average ROI by genre (cross-engine: MySQL financials × PostgreSQL cast data):\n"
+                    + "\n".join(
+                        f"  {r['primary_genre']}: {r['avg_roi']:,.2f}x ROI "
+                        f"({r['movie_count']} movies, avg revenue ${r['avg_revenue_usd'] / 1_000_000:,.1f}M)"
+                        for r in rows
+                    )
                 )
-            ) if rows else "No genre ROI data found in rollup table.",
+                if rows
+                else "No genre ROI data found in rollup table."
+            ),
         }
 
     return None
@@ -215,6 +268,7 @@ def route_and_execute(question: str) -> Optional[dict[str, Any]]:
         elapsed = round(time.perf_counter() - t0, 4)
 
         from pwa.rollups import get_rollup_last_refreshed
+
         last_refreshed = get_rollup_last_refreshed(match["table_name"])
 
         table_ref = f"{project}.{match['table_name']}"
@@ -241,4 +295,3 @@ def route_and_execute(question: str) -> Optional[dict[str, Any]]:
     except Exception as exc:
         logger.warning(f"[Template Router Execution Failed]: {exc}. Falling back to LLM pipeline.")
         return None
-

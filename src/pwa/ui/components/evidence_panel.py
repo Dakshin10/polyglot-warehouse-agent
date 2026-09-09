@@ -61,6 +61,7 @@ def render_evidence_panel(
         df = pd.DataFrame(rows)
         try:
             from pwa.ui.components.viz_panel import render_viz_panel
+
             render_viz_panel(df, viz_rec_dict, msg_idx=msg_idx, question=question)
         except Exception:
             # Visualization is best-effort; never crash the UI over a chart
@@ -109,4 +110,3 @@ def render_evidence_panel(
         }
         st.session_state.active_view = "report"
         st.rerun()
-

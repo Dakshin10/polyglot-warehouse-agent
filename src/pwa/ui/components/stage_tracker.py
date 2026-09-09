@@ -46,8 +46,11 @@ def render_pipeline_trace_expander(
 
     with st.expander(f"Show pipeline trace ({total_time:.2f}s total)", expanded=False):
         st.markdown("<div style='padding: 0.2rem 0;'>", unsafe_allow_html=True)
-        st.markdown("<div class='pwa-quiet-meta' style='margin-bottom: 0.5rem;'>Pipeline stage execution:</div>", unsafe_allow_html=True)
-        
+        st.markdown(
+            "<div class='pwa-quiet-meta' style='margin-bottom: 0.5rem;'>Pipeline stage execution:</div>",
+            unsafe_allow_html=True,
+        )
+
         stages = [
             ("grounding", "1. Schema Grounding"),
             ("sql", "2. SQL Generation"),
@@ -64,10 +67,18 @@ def render_pipeline_trace_expander(
                 lat_text = ""
             elif status_val == "template":
                 badge_html = '<span class="pwa-pill pwa-pill-template">template-match</span>'
-                lat_text = f" <span class='pwa-mono' style='font-size:0.8rem; color:var(--pwa-text-secondary);'>({lat:.2f}s)</span>" if lat else ""
+                lat_text = (
+                    f" <span class='pwa-mono' style='font-size:0.8rem; color:var(--pwa-text-secondary);'>({lat:.2f}s)</span>"
+                    if lat
+                    else ""
+                )
             else:
                 badge_html = '<span class="pwa-pill pwa-pill-llm">LLM-fallback</span>'
-                lat_text = f" <span class='pwa-mono' style='font-size:0.8rem; color:var(--pwa-text-secondary);'>({lat:.2f}s)</span>" if lat else ""
+                lat_text = (
+                    f" <span class='pwa-mono' style='font-size:0.8rem; color:var(--pwa-text-secondary);'>({lat:.2f}s)</span>"
+                    if lat
+                    else ""
+                )
 
             st.markdown(
                 f"""

@@ -26,9 +26,9 @@ _RESULTS_DIR = pathlib.Path(__file__).parent / "results"
 
 # Pricing Configuration
 BQ_PRICE_PER_TB = 6.25  # BigQuery On-Demand rate per TB
-BQ_PRICE_PER_BYTE = BQ_PRICE_PER_TB / (1024 ** 4)
+BQ_PRICE_PER_BYTE = BQ_PRICE_PER_TB / (1024**4)
 
-LLM_INPUT_COST_PER_1M = 0.15   # Gemini 2.5 Flash / Groq input token rate
+LLM_INPUT_COST_PER_1M = 0.15  # Gemini 2.5 Flash / Groq input token rate
 LLM_OUTPUT_COST_PER_1M = 0.60  # Gemini 2.5 Flash / Groq output token rate
 
 
@@ -129,7 +129,9 @@ def run_scenario_sequential(queries: List[Dict[str, Any]], scenario_name: str) -
     for idx, q in enumerate(queries, 1):
         rec = run_single_query_record(q)
         records.append(rec)
-        print(f"  [{idx:02d}/{len(queries):02d}] {rec['id']} ({rec['category']}): {rec['total_latency_ms']}ms | ${rec['total_cost_usd']:.6f}")
+        print(
+            f"  [{idx:02d}/{len(queries):02d}] {rec['id']} ({rec['category']}): {rec['total_latency_ms']}ms | ${rec['total_cost_usd']:.6f}"
+        )
     return records
 
 
@@ -172,8 +174,16 @@ def generate_perf_report(
     cold_lats = [r["total_latency_ms"] for r in cold_records]
     warm_lats = [r["total_latency_ms"] for r in warm_records]
 
-    stats_cold = {"p50": _percentile(cold_lats, 50), "p90": _percentile(cold_lats, 90), "p99": _percentile(cold_lats, 99)}
-    stats_warm = {"p50": _percentile(warm_lats, 50), "p90": _percentile(warm_lats, 90), "p99": _percentile(warm_lats, 99)}
+    stats_cold = {
+        "p50": _percentile(cold_lats, 50),
+        "p90": _percentile(cold_lats, 90),
+        "p99": _percentile(cold_lats, 99),
+    }
+    stats_warm = {
+        "p50": _percentile(warm_lats, 50),
+        "p90": _percentile(warm_lats, 90),
+        "p99": _percentile(warm_lats, 99),
+    }
 
     # Stage Latency Percentiles
     stages = ["schema", "sql", "exec", "answer"]
@@ -252,7 +262,7 @@ def generate_perf_report(
 
 ## 1. Executive Summary & Cost Model
 - **Total Suite Execution Cost:** `${total_cost:.6f}` (BigQuery: `${total_bq_cost:.6f}` · LLM Tokens: `${total_llm_cost:.6f}`)
-- **Total BigQuery Bytes Scanned:** `{total_bytes / (1024*1024):.2f} MB` (`{total_bytes}` bytes)
+- **Total BigQuery Bytes Scanned:** `{total_bytes / (1024 * 1024):.2f} MB` (`{total_bytes}` bytes)
 - **BigQuery Pricing Rate:** `${BQ_PRICE_PER_TB:.2f} / TB` on-demand
 - **Primary Latency Bottleneck:** `{latency_bottleneck[0]}` stage (`{latency_bottleneck[1]}%` of total latency)
 
@@ -262,18 +272,18 @@ def generate_perf_report(
 
 | Scenario / Stage | P50 (ms) | P90 (ms) | P99 (ms) |
 |---|---|---|---|
-| **Cold Baseline (Overall)** | **{stats_cold['p50']:.1f}** | **{stats_cold['p90']:.1f}** | **{stats_cold['p99']:.1f}** |
-| **Warm Repeat (Overall)** | **{stats_warm['p50']:.1f}** | **{stats_warm['p90']:.1f}** | **{stats_warm['p99']:.1f}** |
-| Stage 1: Schema Grounding | {stage_percentiles['schema']['p50']:.1f} | {stage_percentiles['schema']['p90']:.1f} | {stage_percentiles['schema']['p99']:.1f} |
-| Stage 2: SQL Generation | {stage_percentiles['sql']['p50']:.1f} | {stage_percentiles['sql']['p90']:.1f} | {stage_percentiles['sql']['p99']:.1f} |
-| Stage 3: Validation & Execution | {stage_percentiles['exec']['p50']:.1f} | {stage_percentiles['exec']['p90']:.1f} | {stage_percentiles['exec']['p99']:.1f} |
-| Stage 4: Answer Synthesis | {stage_percentiles['answer']['p50']:.1f} | {stage_percentiles['answer']['p90']:.1f} | {stage_percentiles['answer']['p99']:.1f} |
+| **Cold Baseline (Overall)** | **{stats_cold["p50"]:.1f}** | **{stats_cold["p90"]:.1f}** | **{stats_cold["p99"]:.1f}** |
+| **Warm Repeat (Overall)** | **{stats_warm["p50"]:.1f}** | **{stats_warm["p90"]:.1f}** | **{stats_warm["p99"]:.1f}** |
+| Stage 1: Schema Grounding | {stage_percentiles["schema"]["p50"]:.1f} | {stage_percentiles["schema"]["p90"]:.1f} | {stage_percentiles["schema"]["p99"]:.1f} |
+| Stage 2: SQL Generation | {stage_percentiles["sql"]["p50"]:.1f} | {stage_percentiles["sql"]["p90"]:.1f} | {stage_percentiles["sql"]["p99"]:.1f} |
+| Stage 3: Validation & Execution | {stage_percentiles["exec"]["p50"]:.1f} | {stage_percentiles["exec"]["p90"]:.1f} | {stage_percentiles["exec"]["p99"]:.1f} |
+| Stage 4: Answer Synthesis | {stage_percentiles["answer"]["p50"]:.1f} | {stage_percentiles["answer"]["p90"]:.1f} | {stage_percentiles["answer"]["p99"]:.1f} |
 
 ---
 
 ## 3. Cache Effectiveness
-- **Cold P50 Latency:** `{stats_cold['p50']:.1f} ms`
-- **Warm P50 Latency:** `{stats_warm['p50']:.1f} ms`
+- **Cold P50 Latency:** `{stats_cold["p50"]:.1f} ms`
+- **Warm P50 Latency:** `{stats_warm["p50"]:.1f} ms`
 - **Cache Delta:** Saved **`{cache_delta_ms} ms`** (`{cache_delta_pct}%` latency reduction)
 
 ---
@@ -284,7 +294,9 @@ def generate_perf_report(
 |---|---|---|---|---|
 """
     for c, st in cat_stats.items():
-        report_md += f"| `{c}` | {st['count']} | {st['p50_ms']:.1f} | {st['p90_ms']:.1f} | ${st['total_cost_usd']:.6f} |\n"
+        report_md += (
+            f"| `{c}` | {st['count']} | {st['p50_ms']:.1f} | {st['p90_ms']:.1f} | ${st['total_cost_usd']:.6f} |\n"
+        )
 
     report_md += """
 ---

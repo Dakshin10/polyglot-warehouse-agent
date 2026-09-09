@@ -30,6 +30,7 @@ from pwa.ui.styles import apply_custom_styles  # noqa: E402
 # Try importing real orchestrator
 try:
     from pwa.agent.pipeline.orchestrator import PipelineResult, run_query_verbose
+
     _REAL_ORCHESTRATOR_AVAILABLE = True
 except Exception as _import_exc:
     _REAL_ORCHESTRATOR_AVAILABLE = False
@@ -71,17 +72,30 @@ def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResul
                 "reason": "3 movies ranked by revenue — a bar chart makes the ordering immediately scannable.",
             },
             "alternatives": [
-                {"type": "table", "x_col": None, "y_col": None,
-                 "reason": "Table view shows all columns and exact revenue figures."},
+                {
+                    "type": "table",
+                    "x_col": None,
+                    "y_col": None,
+                    "reason": "Table view shows all columns and exact revenue figures.",
+                },
             ],
         },
         executed_at="2026-09-09T07:20:00Z",
         guardrails_applied=[
             {"name": "AST Read-Only Guard", "description": "Enforced AST SELECT-only validation", "rule": "AST-SELECT"},
-            {"name": "Dry-Run Cost Guard", "description": "Verified estimated scan cost within limits", "rule": "Cost-Limit"},
+            {
+                "name": "Dry-Run Cost Guard",
+                "description": "Verified estimated scan cost within limits",
+                "rule": "Cost-Limit",
+            },
         ],
         data_provenance=[
-            {"table_name": "mart.v_movie", "type": "base_mart_view", "description": "Base movie view", "last_refreshed": "Live transactional data"}
+            {
+                "table_name": "mart.v_movie",
+                "type": "base_mart_view",
+                "description": "Base movie view",
+                "last_refreshed": "Live transactional data",
+            }
         ],
     )
 
@@ -124,7 +138,9 @@ def _render_assistant_result(
         return
 
     answer_text = getattr(result, "answer", None) or (result.get("answer") if isinstance(result, dict) else "")
-    stage_latencies = getattr(result, "stage_latencies", None) or (result.get("stage_latencies") if isinstance(result, dict) else {})
+    stage_latencies = getattr(result, "stage_latencies", None) or (
+        result.get("stage_latencies") if isinstance(result, dict) else {}
+    )
 
     if answer_text:
         render_answer_panel(answer_text)
@@ -161,7 +177,6 @@ def main() -> None:
     if st.session_state.active_view == "report" and st.session_state.get("active_report"):
         render_report_view(st.session_state.active_report)
         return
-
 
     # 1. Render Chat Thread Scrollback
     for msg_idx, msg in enumerate(st.session_state.messages):
@@ -220,13 +235,15 @@ def main() -> None:
                 viz_rec = getattr(res, "viz_recommendation", None) or (
                     res.get("viz_recommendation") if isinstance(res, dict) else None
                 )
-            st.session_state.messages.append({
-                "role": "assistant",
-                "content": content_str,
-                "result": res,
-                "question": prompt,
-                "viz_recommendation": viz_rec,
-            })
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": content_str,
+                    "result": res,
+                    "question": prompt,
+                    "viz_recommendation": viz_rec,
+                }
+            )
 
         st.rerun()
 

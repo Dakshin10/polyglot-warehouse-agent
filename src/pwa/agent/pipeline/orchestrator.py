@@ -50,7 +50,6 @@ class PipelineResult:
     data_provenance: list[dict] = field(default_factory=list)
 
 
-
 def create_pipeline_agent() -> SequentialAgent:
     """Create ADK SequentialAgent exposing full multi-agent pipeline."""
     return SequentialAgent(
@@ -123,8 +122,7 @@ def _run_pipeline_stages(
     if result.get("status") == "ERROR":
         error_msg = result.get("error", "Unknown execution error.")
         logger.warning(
-            f"[Pipeline Retry] Attempt 1 failed with status 'ERROR': {error_msg}. "
-            "Retrying once with error feedback..."
+            f"[Pipeline Retry] Attempt 1 failed with status 'ERROR': {error_msg}. Retrying once with error feedback..."
         )
 
         # Stage 2 (Attempt 2 - Retry with error feedback)
@@ -247,7 +245,12 @@ def _run_pipeline_stages(
         )
 
     if ("keyword" in q_sql_combo or "v_movie_keywords" in q_sql_combo or "tags" in q_sql_combo) and (
-        "avg" in q_sql_combo or "sum" in q_sql_combo or "count" in q_sql_combo or "revenue" in q_sql_combo or "roi" in q_sql_combo or "budget" in q_sql_combo
+        "avg" in q_sql_combo
+        or "sum" in q_sql_combo
+        or "count" in q_sql_combo
+        or "revenue" in q_sql_combo
+        or "roi" in q_sql_combo
+        or "budget" in q_sql_combo
     ):
         guardrails_applied.append(
             {
@@ -377,6 +380,7 @@ def run_query_verbose(
 
     if template_result:
         import datetime
+
         logger.info(
             f"[Template Router FAST-PATH] Matched template '{template_result['template_name']}' in {t_route_elapsed}s."
         )
@@ -387,6 +391,7 @@ def run_query_verbose(
             try:
                 import pandas as _pd
                 from pwa.ui.viz_recommendation import build_from_shape
+
                 _tmpl_viz = build_from_shape(_pd.DataFrame(_tmpl_rows), question).to_dict()
             except Exception as _ve:
                 logger.debug(f"[Viz] Fast-path shape build failed: {_ve}")
@@ -405,7 +410,6 @@ def run_query_verbose(
             guardrails_applied=template_result.get("guardrails_applied", []),
             data_provenance=template_result.get("data_provenance", []),
         )
-
 
     # 3. Semantic Cache Lookup (opt-in, gated by PWA_SEMANTIC_CACHE_ENABLED=1)
     cached_answer = semantic_cache.get(question)

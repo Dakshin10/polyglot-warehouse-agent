@@ -94,21 +94,24 @@ def choose_visualization(df: "pd.DataFrame", question: str) -> dict:
         return _fallback
 
     row_count = len(df)
-    col_count = len(df.columns)
     cols = list(df.columns)
 
     # ── Rule 1: single-row aggregate → metric ──────────────────────────────
     if row_count == 1:
         numeric_cols = [c for c in cols if _is_numeric(df[c])]
         meaningful_numerics = [
-            c for c in numeric_cols
-            if not re.search(r"(_|^)(id|rank|year|yr|date|threshold)(_|s|$)", c, re.IGNORECASE)
+            c for c in numeric_cols if not re.search(r"(_|^)(id|rank|year|yr|date|threshold)(_|s|$)", c, re.IGNORECASE)
         ]
         candidates = meaningful_numerics if meaningful_numerics else numeric_cols
 
         metric_named = [
-            c for c in candidates
-            if re.search(r"(avg|sum|total|mean|roi|rate|ratio|count|size|revenue|budget|profit|score|pct|percent)", c, re.IGNORECASE)
+            c
+            for c in candidates
+            if re.search(
+                r"(avg|sum|total|mean|roi|rate|ratio|count|size|revenue|budget|profit|score|pct|percent)",
+                c,
+                re.IGNORECASE,
+            )
         ]
         y_col = metric_named[0] if metric_named else (candidates[0] if candidates else cols[-1])
         return {"type": "metric", "x": None, "y": y_col}
@@ -130,10 +133,7 @@ def choose_visualization(df: "pd.DataFrame", question: str) -> dict:
 
     # Numeric cols that are NOT datetime axis or row index / rank
     non_metric_patterns = re.compile(r"^(rank|id|_id|row_num|row_number)$", re.IGNORECASE)
-    value_numeric_cols = [
-        c for c in numeric_cols
-        if c not in datetime_cols and not non_metric_patterns.search(c)
-    ]
+    value_numeric_cols = [c for c in numeric_cols if c not in datetime_cols and not non_metric_patterns.search(c)]
     if not value_numeric_cols:
         value_numeric_cols = [c for c in numeric_cols if c not in datetime_cols]
 
@@ -154,8 +154,7 @@ def choose_visualization(df: "pd.DataFrame", question: str) -> dict:
     # and first value numeric column as y.
     if pure_categoricals and value_numeric_cols:
         title_cats = [
-            c for c in pure_categoricals
-            if re.search(r"(title|name|director|genre|studio|actor)", c, re.IGNORECASE)
+            c for c in pure_categoricals if re.search(r"(title|name|director|genre|studio|actor)", c, re.IGNORECASE)
         ]
         x_col = title_cats[0] if title_cats else pure_categoricals[0]
         return {"type": "bar", "x": x_col, "y": value_numeric_cols[0]}

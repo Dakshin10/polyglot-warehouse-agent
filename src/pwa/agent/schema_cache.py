@@ -91,7 +91,11 @@ STATIC_MART_SCHEMA: dict[str, list[dict[str, Any]]] = {
         {"name": "budget_usd", "type": "FLOAT64", "description": "Production budget in USD (may be 0 for old films)"},
         {"name": "revenue_usd", "type": "FLOAT64", "description": "Box office revenue in USD"},
         {"name": "profit_usd", "type": "FLOAT64", "description": "Profit in USD (revenue minus budget)"},
-        {"name": "roi", "type": "FLOAT64", "description": "Return on Investment ratio (revenue/budget - 1). Unreliable when budget_usd < 1000 — always filter with WHERE budget_usd > 1000 for ROI queries."},
+        {
+            "name": "roi",
+            "type": "FLOAT64",
+            "description": "Return on Investment ratio (revenue/budget - 1). Unreliable when budget_usd < 1000 — always filter with WHERE budget_usd > 1000 for ROI queries.",
+        },
         {"name": "primary_genre", "type": "STRING", "description": "Primary genre"},
         {"name": "release_year", "type": "INT64", "description": "Year of release"},
         {"name": "vote_average", "type": "FLOAT64", "description": "Average TMDB user rating"},
@@ -115,7 +119,11 @@ STATIC_MART_SCHEMA: dict[str, list[dict[str, Any]]] = {
         {"name": "release_year", "type": "INT64", "description": "Release year"},
         {"name": "revenue_usd", "type": "FLOAT64", "description": "Revenue"},
         {"name": "profit_usd", "type": "FLOAT64", "description": "Profit"},
-        {"name": "roi", "type": "FLOAT64", "description": "ROI — filter budget_usd > 1000 to avoid silent-era division-by-zero artifacts"},
+        {
+            "name": "roi",
+            "type": "FLOAT64",
+            "description": "ROI — filter budget_usd > 1000 to avoid silent-era division-by-zero artifacts",
+        },
         {"name": "primary_genre", "type": "STRING", "description": "Primary genre"},
         {"name": "vote_average", "type": "FLOAT64", "description": "Average rating"},
         {"name": "director_name", "type": "STRING", "description": "Director name"},
@@ -154,6 +162,7 @@ def get_schema_snapshot(
     if not _project or not _dataset:
         try:
             from pwa.settings import get_settings
+
             s = get_settings()
             _project = _project or s.gcp_project
             _dataset = _dataset or s.bq_ds_mart

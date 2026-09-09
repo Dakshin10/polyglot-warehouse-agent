@@ -83,6 +83,11 @@ def test_generate_perf_report():
         "llm_cost_usd": 0.0001,
         "total_cost_usd": 0.0002,
     }
-    metrics, report_md = generate_perf_report([record], [record], [record], [{"concurrency": 1, "total_wall_seconds": 0.5, "p50_ms": 500.0, "p90_ms": 500.0, "error_rate_pct": 0.0}])
+    metrics, report_md = generate_perf_report(
+        [record],
+        [record],
+        [record],
+        [{"concurrency": 1, "total_wall_seconds": 0.5, "p50_ms": 500.0, "p90_ms": 500.0, "error_rate_pct": 0.0}],
+    )
     assert "Performance & Cost Report" in report_md
     assert metrics["total_cost_usd"] > 0

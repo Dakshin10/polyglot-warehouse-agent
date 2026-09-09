@@ -205,10 +205,7 @@ def setup_warehouse_agent_sa(project):
         client = get_bq_client()
         dataset_ref = client.get_dataset(f"{project}.{ds_mart}")
         access_entries = list(dataset_ref.access_entries)
-        exists = any(
-            e.role == "roles/bigquery.dataViewer" and e.entity_id == sa_email
-            for e in access_entries
-        )
+        exists = any(e.role == "roles/bigquery.dataViewer" and e.entity_id == sa_email for e in access_entries)
         if not exists:
             access_entries.append(
                 bigquery.AccessEntry(

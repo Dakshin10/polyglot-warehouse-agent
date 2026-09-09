@@ -112,7 +112,6 @@ def generate_report_pdf(
         pdf.cell(0, 6, f"Full Results Table ({len(rows)} rows):")
         pdf.ln(8)
 
-
         cols = list(rows[0].keys())
         printable_width = 190.0
         col_width = max(18.0, printable_width / len(cols))

@@ -194,7 +194,6 @@ def part1_code_inventory(state: AuditState) -> None:
         if reach == "NO - DEAD":
             state.problem(f"{mod} is not reachable from any entry point (dead code)")
 
-
     print(f"\n{'SQL FILE':<34} | {'LINES':>5} | REFERENCED BY")
     print("-" * 100)
     src_text = "\n".join(p.read_text(encoding="utf-8") for p in py_files)

@@ -1,6 +1,6 @@
 """Verification test suite for query-specific guardrails and provenance surfacing."""
 
-from pwa.agent.pipeline.orchestrator import PipelineResult, run_query_verbose
+from pwa.agent.pipeline.orchestrator import PipelineResult
 from pwa.agent.template_router import route_and_execute
 
 
@@ -33,7 +33,6 @@ def test_llm_fallback_roi_guardrail():
 
     # We mock or run the orchestrator's stage 3 return
     # Here we test run_query_verbose or _run_pipeline_stages logic
-    from pwa.agent.pipeline.orchestrator import _run_pipeline_stages
 
     # Stub models or stage execution
     class DummyModel:

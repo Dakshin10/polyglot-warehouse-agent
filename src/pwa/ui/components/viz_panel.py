@@ -16,13 +16,13 @@ No new query, no new LLM call — purely a client-side re-render.
 
 from __future__ import annotations
 
-from typing import Any
 
 import pandas as pd
 import streamlit as st
 
 
 # ─── Chart dispatch ───────────────────────────────────────────────────────────
+
 
 def _render_chart_for_spec(
     df: pd.DataFrame,
@@ -101,6 +101,7 @@ def _btn_label(spec_type: str) -> str:
 
 # ─── Public render function ───────────────────────────────────────────────────
 
+
 def render_viz_panel(
     df: pd.DataFrame,
     recommendation_dict: dict | None,
@@ -124,6 +125,7 @@ def render_viz_panel(
     if not recommendation_dict:
         try:
             from pwa.ui.viz_recommendation import build_from_shape
+
             recommendation_dict = build_from_shape(df, question).to_dict()
         except Exception:
             return  # silently skip if everything fails
@@ -163,7 +165,7 @@ def render_viz_panel(
         for i, (col, spec) in enumerate(zip(cols, all_specs)):
             stype = spec.get("type", "table")
             label = _btn_label(stype)
-            is_active = (i == active_idx)
+            is_active = i == active_idx
             btn_key = f"viz_btn_{msg_idx}_{i}"
             with col:
                 if is_active:

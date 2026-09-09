@@ -137,4 +137,3 @@ class TestCardinalityAnnotations:
     def test_keywords_cardinality_is_one_to_many(self):
         card = sc.get_view_cardinality("mart.v_movie_keywords")
         assert "one-to-many" in card
-

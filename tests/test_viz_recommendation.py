@@ -3,8 +3,6 @@
 All tests are pure-Python: no Streamlit, no BigQuery, no LLM calls.
 """
 
-import json
-
 import pandas as pd
 import pytest
 
@@ -20,6 +18,7 @@ from pwa.agent.pipeline.answer_agent import _extract_viz_json
 
 
 # ─── VizSpec ─────────────────────────────────────────────────────────────────
+
 
 class TestVizSpec:
     def test_to_dict_round_trip(self):
@@ -53,6 +52,7 @@ class TestVizSpec:
 
 # ─── VizRecommendation ────────────────────────────────────────────────────────
 
+
 class TestVizRecommendation:
     def test_to_dict_from_dict_round_trip(self):
         rec = VizRecommendation(
@@ -78,6 +78,7 @@ class TestVizRecommendation:
 
 # ─── build_from_shape: primary type ──────────────────────────────────────────
 
+
 class TestBuildFromShape:
     def test_single_row_two_cols_gives_metric(self):
         df = pd.DataFrame([{"director_name": "Nolan", "avg_roi": 4.23}])
@@ -96,13 +97,15 @@ class TestBuildFromShape:
     def test_genre_rollup_multi_numeric_gives_bar(self):
         """avg_roi_by_genre: 1 categorical + 4 numeric cols → bar."""
         genres = ["Action", "Drama", "Comedy", "Horror", "Romance", "Thriller", "Animation", "Sci-Fi"]
-        df = pd.DataFrame({
-            "primary_genre": genres,
-            "avg_roi": [3.1, 2.4, 2.8, 4.0, 1.9, 3.5, 5.2, 2.1],
-            "avg_revenue_usd": [2e8, 1.5e8, 1.2e8, 0.8e8, 0.9e8, 1.8e8, 3e8, 1.4e8],
-            "avg_budget_usd": [6e7, 5e7, 4e7, 2e7, 3e7, 5e7, 4e7, 4.5e7],
-            "movie_count": [450, 600, 550, 300, 350, 400, 200, 180],
-        })
+        df = pd.DataFrame(
+            {
+                "primary_genre": genres,
+                "avg_roi": [3.1, 2.4, 2.8, 4.0, 1.9, 3.5, 5.2, 2.1],
+                "avg_revenue_usd": [2e8, 1.5e8, 1.2e8, 0.8e8, 0.9e8, 1.8e8, 3e8, 1.4e8],
+                "avg_budget_usd": [6e7, 5e7, 4e7, 2e7, 3e7, 5e7, 4e7, 4.5e7],
+                "movie_count": [450, 600, 550, 300, 350, 400, 200, 180],
+            }
+        )
         rec = build_from_shape(df, "average ROI by genre")
         assert rec.primary.type == "bar"
         assert rec.primary.x_col == "primary_genre"
@@ -125,7 +128,10 @@ class TestBuildFromShape:
             ({"avg_cast_size": 42.7}, "average cast size"),
             ({"director_name": "Christopher Nolan", "avg_roi": 4.23}, "highest average ROI director"),
             ({"director_name": "Steven Spielberg", "avg_roi": 5.4, "movie_count": 27}, "highest average ROI director"),
-            ({"revenue_threshold": 500_000_000, "avg_cast_size": 42.7, "movie_count": 15}, "average cast size for movies over $500M"),
+            (
+                {"revenue_threshold": 500_000_000, "avg_cast_size": 42.7, "movie_count": 15},
+                "average cast size for movies over $500M",
+            ),
             ({"avg_budget": 1e8, "avg_revenue": 3e8, "avg_roi": 3.0, "total_movies": 50}, "overall summary"),
         ],
     )
@@ -137,6 +143,7 @@ class TestBuildFromShape:
 
 
 # ─── build_from_shape: alternatives ──────────────────────────────────────────
+
 
 class TestBuildFromShapeAlternatives:
     def test_metric_has_table_alternative(self):
@@ -194,6 +201,7 @@ class TestBuildFromShapeAlternatives:
 
 # ─── build_from_llm_dict ─────────────────────────────────────────────────────
 
+
 class TestBuildFromLlmDict:
     def test_valid_dict_returns_recommendation(self):
         d = {
@@ -231,6 +239,7 @@ class TestBuildFromLlmDict:
 
 # ─── VIZ_JSON delimiter parsing ──────────────────────────────────────────────
 
+
 class TestExtractVizJson:
     def test_present_block_extracted_and_stripped(self):
         raw = (
@@ -258,13 +267,14 @@ class TestExtractVizJson:
         assert viz is None
 
     def test_case_insensitive_marker(self):
-        raw = "Answer.\n<!-- viz_json\n{\"primary\":{\"type\":\"table\",\"x_col\":null,\"y_col\":null,\"reason\":\".\"},\"alternatives\":[]}\n-->"
+        raw = 'Answer.\n<!-- viz_json\n{"primary":{"type":"table","x_col":null,"y_col":null,"reason":"."},"alternatives":[]}\n-->'
         answer, viz = _extract_viz_json(raw)
         assert viz is not None
         assert viz["primary"]["type"] == "table"
 
 
 # ─── format_schema_for_prompt ────────────────────────────────────────────────
+
 
 class TestFormatSchemaForPrompt:
     def test_non_empty_rows_lists_cols_and_count(self):

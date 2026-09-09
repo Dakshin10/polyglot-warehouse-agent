@@ -60,13 +60,15 @@ def format_markdown_report(
     else:
         lines.append("- Dynamic query over base warehouse views")
 
-    lines.extend([
-        "",
-        "---",
-        "",
-        "## Guardrails & Rules Applied",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "---",
+            "",
+            "## Guardrails & Rules Applied",
+            "",
+        ]
+    )
 
     if guardrails:
         for g in guardrails:
@@ -74,13 +76,15 @@ def format_markdown_report(
     else:
         lines.append("- Standard AST read-only validation applied")
 
-    lines.extend([
-        "",
-        "---",
-        "",
-        f"## Full Results Table ({row_count} rows)",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "---",
+            "",
+            f"## Full Results Table ({row_count} rows)",
+            "",
+        ]
+    )
 
     if rows and len(rows) > 0:
         try:
@@ -98,7 +102,8 @@ def render_report_view(report_data: dict[str, Any]) -> None:
     result = report_data.get("result")
 
     # Extract attributes safely from PipelineResult or dict
-    answer = getattr(result, "answer", None) or (result.get("answer") if isinstance(result, dict) else "")
+    answer_raw = getattr(result, "answer", None) or (result.get("answer") if isinstance(result, dict) else "")
+    answer: str = str(answer_raw) if answer_raw is not None else ""
     sql = getattr(result, "sql", None) or (result.get("sql") if isinstance(result, dict) else "")
     rows = getattr(result, "rows", None) or (result.get("rows") if isinstance(result, dict) else [])
     bytes_scanned = getattr(result, "bytes_scanned", 0) or 0
@@ -188,7 +193,7 @@ def render_report_view(report_data: dict[str, Any]) -> None:
     # 2g. Diagnostic Details
     col1, col2, col3 = st.columns(3)
     col1.metric("Rows Returned", f"{row_count:,}")
-    col2.metric("Bytes Scanned", f"{bytes_scanned / (1024*1024):,.2f} MB" if bytes_scanned else "0 MB")
+    col2.metric("Bytes Scanned", f"{bytes_scanned / (1024 * 1024):,.2f} MB" if bytes_scanned else "0 MB")
     col3.metric("Slot MS", f"{slot_ms:,}" if slot_ms else "N/A")
 
     st.divider()

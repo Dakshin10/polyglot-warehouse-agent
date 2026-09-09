@@ -164,10 +164,14 @@ def run_benchmark(
                 "row_count": res.row_count if isinstance(res, PipelineResult) else 0,
                 "answer": answer_str,
                 "bytes_scanned": bytes_scanned,
-                "actual_bytes_processed": getattr(res, "actual_bytes_processed", bytes_scanned) if isinstance(res, PipelineResult) else 0,
+                "actual_bytes_processed": getattr(res, "actual_bytes_processed", bytes_scanned)
+                if isinstance(res, PipelineResult)
+                else 0,
                 "slot_ms": getattr(res, "slot_ms", 0) if isinstance(res, PipelineResult) else 0,
                 "latency_ms": latency_ms,
-                "stage_latencies_ms": {k: round(v * 1000, 1) for k, v in res.stage_latencies.items()} if isinstance(res, PipelineResult) else {},
+                "stage_latencies_ms": {k: round(v * 1000, 1) for k, v in res.stage_latencies.items()}
+                if isinstance(res, PipelineResult)
+                else {},
                 "expected_match": expected_match,
             }
         )
@@ -179,8 +183,12 @@ def run_benchmark(
 
     print("\n--------------------------------------------------------------------------------")
     print(" BENCHMARK SUMMARY REPORT")
-    print(f" Total Queries: {total_queries} | Passed: {passed_count} | Failed: {failed_count} | Pass Rate: {pass_rate}%")
-    print(f" Total Suite Wall-Clock Latency: {total_suite_latency_s}s | Total Bytes Scanned: {total_bytes / (1024*1024):.2f} MB")
+    print(
+        f" Total Queries: {total_queries} | Passed: {passed_count} | Failed: {failed_count} | Pass Rate: {pass_rate}%"
+    )
+    print(
+        f" Total Suite Wall-Clock Latency: {total_suite_latency_s}s | Total Bytes Scanned: {total_bytes / (1024 * 1024):.2f} MB"
+    )
     print("--------------------------------------------------------------------------------")
     print(f"{'Category':<20} | {'Total':<8} | {'Passed':<8} | {'Failed':<8} | {'Pass Rate':<10}")
     print("-" * 64)
@@ -225,7 +233,9 @@ def run_benchmark(
 
     # Enforce --fail-under if specified
     if fail_under is not None and pass_rate < fail_under:
-        print(f"[FAIL-UNDER CRITERIA TRIPPED] Pass rate {pass_rate}% is below required {fail_under}%. Exiting non-zero.")
+        print(
+            f"[FAIL-UNDER CRITERIA TRIPPED] Pass rate {pass_rate}% is below required {fail_under}%. Exiting non-zero."
+        )
         sys.exit(1)
 
     return run_payload

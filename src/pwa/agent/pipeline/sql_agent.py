@@ -56,6 +56,8 @@ def _build_fewshot_block(question: str) -> str:
         lines.append(f"  Question: {ex['question']}")
         lines.append(f"  SQL: {ex['sql']}")
     return "\n".join(lines)
+
+
 SQL_GENERATION_INSTRUCTION = """You are a SQL Generation Agent for BigQuery data warehouse.
 Your job is to generate ONE valid BigQuery SQL query to answer the user's question, given the grounded schema context.
 

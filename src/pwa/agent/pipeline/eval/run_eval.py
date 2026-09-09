@@ -107,9 +107,7 @@ def run_eval(
 
     print(f"\n{_BOLD}=== PWA Golden Regression Evaluation ==={_RESET}")
     print(f"Golden set: {golden_path}  ({total} entries)\n")
-    print(
-        f"{'ID':<6}  {'Question':<50}  {'Status':<8}  {'Latency':<10}  Reason"
-    )
+    print(f"{'ID':<6}  {'Question':<50}  {'Status':<8}  {'Latency':<10}  Reason")
     print("-" * 120)
 
     for entry in entries:
@@ -124,13 +122,8 @@ def run_eval(
 
         passed_entry, reason = _evaluate_entry(entry, answer)
 
-        status_str = (
-            _colour("PASS", _GREEN) if passed_entry else _colour("FAIL", _RED)
-        )
-        print(
-            f"{eid:<6}  {_truncate(question, 50):<50}  {status_str:<8}  "
-            f"{latency:>7.2f}s    {_truncate(reason, 60)}"
-        )
+        status_str = _colour("PASS", _GREEN) if passed_entry else _colour("FAIL", _RED)
+        print(f"{eid:<6}  {_truncate(question, 50):<50}  {status_str:<8}  {latency:>7.2f}s    {_truncate(reason, 60)}")
 
         if passed_entry:
             passed += 1

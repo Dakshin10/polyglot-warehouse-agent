@@ -1,7 +1,5 @@
 """Unit tests for Report View components, PDF export, and Markdown formatting."""
 
-from typing import Any
-from pwa.agent.pipeline.orchestrator import PipelineResult
 from pwa.ui.components.report_view import format_markdown_report
 from pwa.ui.pdf_export import generate_report_pdf
 
@@ -14,7 +12,10 @@ def test_format_markdown_report():
     routing_path = "template-match"
     timestamp = "2026-09-09 12:00:00 UTC"
     guardrails = [
-        {"name": "ROI Guard", "description": "Excluded films with budget_usd <= $1,000 (11 films) to prevent divide-by-near-zero ROI distortion"}
+        {
+            "name": "ROI Guard",
+            "description": "Excluded films with budget_usd <= $1,000 (11 films) to prevent divide-by-near-zero ROI distortion",
+        }
     ]
     provenance = [
         {"table_name": "rollup.avg_roi_by_director", "type": "rollup", "last_refreshed": "2026-09-09 07:00:00 UTC"}

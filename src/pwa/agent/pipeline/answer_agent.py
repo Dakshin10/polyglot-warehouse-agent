@@ -102,6 +102,7 @@ RULES for the VIZ recommendation:
 
 # ─── Agent factory ────────────────────────────────────────────────────────────
 
+
 def build_answer_agent(model: Any = None) -> Agent:
     _init_env()
     selected_model = get_model_for_stage("answer") if model is None else get_agent_model(model)
@@ -117,6 +118,7 @@ def build_answer_agent(model: Any = None) -> Agent:
 
 
 # ─── Main synthesis function ──────────────────────────────────────────────────
+
 
 def synthesize_answer(
     question: str,
@@ -135,14 +137,14 @@ def synthesize_answer(
         ``VizRecommendation`` dict or ``None`` if the LLM omitted / corrupted it.
     """
     logger.debug(
-        f"[Stage 4 - AnswerSynthesisAgent Input]: question='{question}', "
-        f"result_status='{result.get('status')}'"
+        f"[Stage 4 - AnswerSynthesisAgent Input]: question='{question}', result_status='{result.get('status')}'"
     )
     _init_env()
 
     # Build schema context for the viz recommendation decision
     rows = result.get("rows") or []
     from pwa.ui.viz_recommendation import format_schema_for_prompt
+
     schema_ctx = format_schema_for_prompt(rows)
 
     result_json = json.dumps(result, indent=2)
@@ -158,9 +160,7 @@ def synthesize_answer(
     runner = InMemoryRunner(agent=agent, app_name="pwa_pipeline")
 
     async def _run() -> str:
-        session = await runner.session_service.create_session(
-            app_name="pwa_pipeline", user_id="pipeline_user"
-        )
+        session = await runner.session_service.create_session(app_name="pwa_pipeline", user_id="pipeline_user")
         response_text = ""
         async for event in runner.run_async(
             user_id="pipeline_user",

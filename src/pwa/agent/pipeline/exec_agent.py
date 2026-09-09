@@ -80,10 +80,7 @@ def ast_validate_sql(sql: str) -> None:
 
     # 4. Table-level allowlist check — skip entirely when EXTERNAL_QUERY is present
     #    because inner table refs are string literal arguments validated server-side.
-    has_external_query = any(
-        fn for fn in parsed.find_all(exp.Anonymous)
-        if "EXTERNAL_QUERY" in (fn.name or "").upper()
-    )
+    has_external_query = any(fn for fn in parsed.find_all(exp.Anonymous) if "EXTERNAL_QUERY" in (fn.name or "").upper())
     if not has_external_query:
         for tbl in parsed.find_all(exp.Table):
             # sqlglot splits "project.dataset.table" into catalog/db/name.

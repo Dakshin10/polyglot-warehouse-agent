@@ -1,7 +1,6 @@
 """Unit tests for shape-based visualization router (no LLM, no BigQuery)."""
 
 import pandas as pd
-import pytest
 
 from pwa.ui.viz_router import choose_visualization
 
@@ -9,6 +8,7 @@ from pwa.ui.viz_router import choose_visualization
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _df(*records, **col_overrides):
     """Build a small DataFrame from a list of dicts."""
@@ -18,6 +18,7 @@ def _df(*records, **col_overrides):
 # ──────────────────────────────────────────────────────────────────────────────
 # metric cases
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestMetric:
     def test_single_row_two_cols_gives_metric(self):
@@ -45,6 +46,7 @@ class TestMetric:
 # table cases
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestTable:
     def test_more_than_20_rows_always_table(self):
         """21 rows → table regardless of column count."""
@@ -59,17 +61,13 @@ class TestTable:
 
     def test_multiple_categorical_cols_table(self):
         """3 categorical columns → no clean x/y pair → table."""
-        df = pd.DataFrame(
-            {"director": ["A", "B"], "genre": ["Action", "Drama"], "studio": ["X", "Y"]}
-        )
+        df = pd.DataFrame({"director": ["A", "B"], "genre": ["Action", "Drama"], "studio": ["X", "Y"]})
         result = choose_visualization(df, "directors and genres by studio")
         assert result["type"] == "table"
 
     def test_three_numeric_cols_table(self):
         """3 numeric columns (no clean single y) → table."""
-        df = pd.DataFrame(
-            {"budget": [100, 200], "revenue": [300, 400], "profit": [200, 200]}
-        )
+        df = pd.DataFrame({"budget": [100, 200], "revenue": [300, 400], "profit": [200, 200]})
         result = choose_visualization(df, "budget revenue profit breakdown")
         assert result["type"] == "table"
 
@@ -83,6 +81,7 @@ class TestTable:
 # bar cases
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class TestBar:
     def test_top5_movies_by_revenue_gives_bar(self):
         """top 5 highest-grossing movies → title (cat) + revenue (num), 5 rows."""
@@ -95,9 +94,7 @@ class TestBar:
 
     def test_genre_breakdown_gives_bar(self):
         """average ROI by genre (e.g. 8 genres) → bar."""
-        df = pd.DataFrame(
-            {"genre": ["Action", "Drama", "Comedy", "Horror"], "avg_roi": [3.1, 2.4, 2.8, 4.0]}
-        )
+        df = pd.DataFrame({"genre": ["Action", "Drama", "Comedy", "Horror"], "avg_roi": [3.1, 2.4, 2.8, 4.0]})
         result = choose_visualization(df, "average ROI by genre")
         assert result["type"] == "bar"
         assert result["x"] == "genre"
@@ -119,6 +116,7 @@ class TestBar:
 # ──────────────────────────────────────────────────────────────────────────────
 # line cases
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestLine:
     def test_year_column_plus_numeric_gives_line(self):
@@ -161,6 +159,7 @@ class TestLine:
 # ──────────────────────────────────────────────────────────────────────────────
 # x / y invariants
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class TestColumnInvariants:
     def test_metric_has_no_x(self):

@@ -12,7 +12,6 @@ Used by:
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
@@ -33,11 +32,12 @@ _TYPE_ICONS = {
 
 # ─── Dataclasses ─────────────────────────────────────────────────────────────
 
+
 @dataclass
 class VizSpec:
     """A single chart recommendation."""
 
-    type: str            # one of VALID_TYPES
+    type: str  # one of VALID_TYPES
     x_col: str | None = None
     y_col: str | None = None
     reason: str = ""
@@ -100,6 +100,7 @@ class VizRecommendation:
 
 # ─── Templated reason strings ─────────────────────────────────────────────────
 
+
 def _bar_reason(x_col: str | None, y_col: str | None, n: int) -> str:
     x = x_col or "category"
     y = y_col or "value"
@@ -112,9 +113,7 @@ def _bar_reason(x_col: str | None, y_col: str | None, n: int) -> str:
 def _line_reason(x_col: str | None, y_col: str | None, n: int) -> str:
     x = x_col or "time axis"
     y = y_col or "value"
-    return (
-        f"'{y}' plotted over '{x}' — a line chart reveals the trend and direction of change."
-    )
+    return f"'{y}' plotted over '{x}' — a line chart reveals the trend and direction of change."
 
 
 def _metric_reason(y_col: str | None) -> str:
@@ -123,22 +122,17 @@ def _metric_reason(y_col: str | None) -> str:
 
 
 def _table_reason(n_rows: int, n_cols: int) -> str:
-    return (
-        f"{n_rows} rows × {n_cols} columns — a table preserves all detail "
-        "and exact values for every column."
-    )
+    return f"{n_rows} rows × {n_cols} columns — a table preserves all detail and exact values for every column."
 
 
 def _scatter_reason(x_col: str | None, y_col: str | None) -> str:
     x = x_col or "X"
     y = y_col or "Y"
-    return (
-        f"'{x}' vs '{y}' as two numeric dimensions — "
-        "a scatter plot reveals the distribution and correlation."
-    )
+    return f"'{x}' vs '{y}' as two numeric dimensions — a scatter plot reveals the distribution and correlation."
 
 
 # ─── Alternative generation ───────────────────────────────────────────────────
+
 
 def _build_alternatives(primary: VizSpec, df: "pd.DataFrame", question: str) -> list[VizSpec]:
     """Generate 0-2 deterministic alternative VizSpecs for a given primary."""
@@ -148,62 +142,77 @@ def _build_alternatives(primary: VizSpec, df: "pd.DataFrame", question: str) -> 
 
     if ptype == "metric":
         # Offer a table so the user can see if there are other rows
-        alts.append(VizSpec(
-            type="table",
-            reason=_table_reason(n_rows, n_cols),
-        ))
+        alts.append(
+            VizSpec(
+                type="table",
+                reason=_table_reason(n_rows, n_cols),
+            )
+        )
 
     elif ptype == "bar":
         # Always offer table (exact numbers)
-        alts.append(VizSpec(
-            type="table",
-            x_col=primary.x_col,
-            y_col=primary.y_col,
-            reason=_table_reason(n_rows, n_cols),
-        ))
-        # Upgrade to line only if question has trend signal
-        if _has_trend_keyword(question):
-            alts.append(VizSpec(
-                type="line",
+        alts.append(
+            VizSpec(
+                type="table",
                 x_col=primary.x_col,
                 y_col=primary.y_col,
-                reason=_line_reason(primary.x_col, primary.y_col, n_rows),
-            ))
+                reason=_table_reason(n_rows, n_cols),
+            )
+        )
+        # Upgrade to line only if question has trend signal
+        if _has_trend_keyword(question):
+            alts.append(
+                VizSpec(
+                    type="line",
+                    x_col=primary.x_col,
+                    y_col=primary.y_col,
+                    reason=_line_reason(primary.x_col, primary.y_col, n_rows),
+                )
+            )
 
     elif ptype == "line":
         # Offer bar (period-by-period comparison) + table
-        alts.append(VizSpec(
-            type="bar",
-            x_col=primary.x_col,
-            y_col=primary.y_col,
-            reason=_bar_reason(primary.x_col, primary.y_col, n_rows),
-        ))
-        alts.append(VizSpec(
-            type="table",
-            reason=_table_reason(n_rows, n_cols),
-        ))
+        alts.append(
+            VizSpec(
+                type="bar",
+                x_col=primary.x_col,
+                y_col=primary.y_col,
+                reason=_bar_reason(primary.x_col, primary.y_col, n_rows),
+            )
+        )
+        alts.append(
+            VizSpec(
+                type="table",
+                reason=_table_reason(n_rows, n_cols),
+            )
+        )
 
     elif ptype == "table":
         # Try to offer a bar if a cat+num pair exists
         from pwa.ui.viz_router import _is_numeric  # type: ignore[attr-defined]
+
         cols = list(df.columns)
         num_cols = [c for c in cols if _is_numeric(df[c])]
         cat_cols = [c for c in cols if c not in num_cols]
         if cat_cols and num_cols:
             x = cat_cols[0]
             y = num_cols[0]
-            alts.append(VizSpec(
-                type="bar",
-                x_col=x,
-                y_col=y,
-                reason=_bar_reason(x, y, n_rows),
-            ))
+            alts.append(
+                VizSpec(
+                    type="bar",
+                    x_col=x,
+                    y_col=y,
+                    reason=_bar_reason(x, y, n_rows),
+                )
+            )
 
     elif ptype == "scatter":
-        alts.append(VizSpec(
-            type="table",
-            reason=_table_reason(n_rows, n_cols),
-        ))
+        alts.append(
+            VizSpec(
+                type="table",
+                reason=_table_reason(n_rows, n_cols),
+            )
+        )
 
     return alts[:2]  # cap at 2 alternatives
 
@@ -211,8 +220,18 @@ def _build_alternatives(primary: VizSpec, df: "pd.DataFrame", question: str) -> 
 # ─── Trend keyword helper (mirrors viz_router) ────────────────────────────────
 
 _TREND_KEYWORDS = (
-    "trend", "over time", "by year", "per year", "by month", "per month",
-    "over the years", "annually", "year over year", "yoy", "time series", "historical",
+    "trend",
+    "over time",
+    "by year",
+    "per year",
+    "by month",
+    "per month",
+    "over the years",
+    "annually",
+    "year over year",
+    "yoy",
+    "time series",
+    "historical",
 )
 
 
@@ -222,6 +241,7 @@ def _has_trend_keyword(question: str) -> bool:
 
 
 # ─── Public builders ──────────────────────────────────────────────────────────
+
 
 def build_from_shape(df: "pd.DataFrame", question: str) -> VizRecommendation:
     """Build a VizRecommendation using shape-based heuristics only — 0 LLM calls.
@@ -284,6 +304,7 @@ def format_schema_for_prompt(rows: list[dict]) -> str:
         return "Result: empty (0 rows)."
     try:
         import pandas as pd
+
         df = pd.DataFrame(rows)
         col_parts = ", ".join(f"{col} ({dtype})" for col, dtype in df.dtypes.items())
         return f"Columns: {col_parts}. Row count: {len(df)}."

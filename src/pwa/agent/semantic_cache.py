@@ -40,7 +40,7 @@ def _ngrams(text: str, n: int = 3) -> Counter:
     s = text.lower().strip()
     if len(s) < n:
         return Counter({s: 1})
-    return Counter(s[i: i + n] for i in range(len(s) - n + 1))
+    return Counter(s[i : i + n] for i in range(len(s) - n + 1))
 
 
 def _cosine_similarity(a: Counter, b: Counter) -> float:
@@ -101,10 +101,7 @@ class SemanticCache:
             )
             return best_entry["answer"]
 
-        logger.debug(
-            f"[Semantic Cache MISS] best_similarity={best_sim:.3f} "
-            f"for question='{question[:60]}...'"
-        )
+        logger.debug(f"[Semantic Cache MISS] best_similarity={best_sim:.3f} for question='{question[:60]}...'")
         return None
 
     def put(self, question: str, answer: str) -> None:

@@ -16,16 +16,14 @@ from pwa.agent.pipeline.exec_agent import ast_validate_sql
 # Valid SELECTs — must all PASS
 # ---------------------------------------------------------------------------
 
+
 class TestValidSelects:
     def test_simple_select_passes(self):
         sql = "SELECT title, revenue_usd FROM `salitsteel-502008.mart.v_movie` LIMIT 10"
         ast_validate_sql(sql)  # Should not raise
 
     def test_select_with_where_passes(self):
-        sql = (
-            "SELECT title, release_year FROM `salitsteel-502008.mart.v_movie` "
-            "WHERE release_year = 2010 LIMIT 5"
-        )
+        sql = "SELECT title, release_year FROM `salitsteel-502008.mart.v_movie` WHERE release_year = 2010 LIMIT 5"
         ast_validate_sql(sql)
 
     def test_select_with_join_passes(self):
@@ -80,6 +78,7 @@ class TestValidSelects:
 # Forbidden top-level statements — must all RAISE ValueError
 # ---------------------------------------------------------------------------
 
+
 class TestTopLevelForbiddenStatements:
     def test_drop_table_rejected(self):
         sql = "DROP TABLE `salitsteel-502008.mart.v_movie`"
@@ -116,33 +115,22 @@ class TestTopLevelForbiddenStatements:
 # Write ops HIDDEN inside CTEs — the keyword-blocklist would have missed these
 # ---------------------------------------------------------------------------
 
+
 class TestWriteHiddenInCTE:
     def test_delete_inside_cte_rejected(self):
         """A DELETE smuggled inside a CTE must be rejected by the AST walker."""
-        sql = (
-            "WITH evil AS ("
-            "  DELETE FROM `salitsteel-502008.mart.v_movie` WHERE 1=1"
-            ") "
-            "SELECT 1"
-        )
+        sql = "WITH evil AS (  DELETE FROM `salitsteel-502008.mart.v_movie` WHERE 1=1) SELECT 1"
         with pytest.raises(ValueError):
             ast_validate_sql(sql)
 
     def test_insert_inside_cte_rejected(self):
-        sql = (
-            "WITH evil AS ("
-            "  INSERT INTO `salitsteel-502008.mart.v_movie` (title) VALUES ('x')"
-            ") "
-            "SELECT 1"
-        )
+        sql = "WITH evil AS (  INSERT INTO `salitsteel-502008.mart.v_movie` (title) VALUES ('x')) SELECT 1"
         with pytest.raises(ValueError):
             ast_validate_sql(sql)
 
     def test_drop_inside_subquery_rejected(self):
         """Demonstrates AST catch of DROP nested in a sub-expression."""
-        sql = (
-            "SELECT (DROP TABLE `salitsteel-502008.mart.v_movie`)"
-        )
+        sql = "SELECT (DROP TABLE `salitsteel-502008.mart.v_movie`)"
         with pytest.raises(ValueError):
             ast_validate_sql(sql)
 
@@ -150,6 +138,7 @@ class TestWriteHiddenInCTE:
 # ---------------------------------------------------------------------------
 # Malformed / unparseable SQL — must raise ValueError
 # ---------------------------------------------------------------------------
+
 
 class TestMalformedSQL:
     def test_empty_string_rejected(self):
@@ -177,13 +166,11 @@ class TestMalformedSQL:
 # Edge cases
 # ---------------------------------------------------------------------------
 
+
 class TestEdgeCases:
     def test_select_with_comment_passes(self):
         """SQL with comments must still parse and pass."""
-        sql = (
-            "-- get top movies\n"
-            "SELECT title, revenue_usd FROM `salitsteel-502008.mart.v_movie` LIMIT 5"
-        )
+        sql = "-- get top movies\nSELECT title, revenue_usd FROM `salitsteel-502008.mart.v_movie` LIMIT 5"
         ast_validate_sql(sql)
 
     def test_backtick_wrapped_sql_passes(self):

@@ -42,7 +42,7 @@ class TestErrorRetry:
                 ({"relevant_views": [], "reasoning": "ok"}, None),  # schema stage
                 ("SELECT title FROM mart.v_movie LIMIT 10", None),  # sql attempt 1
                 ("SELECT title FROM mart.v_movie LIMIT 10", None),  # sql retry attempt 2
-                ("The top movies are ...", None),                    # answer stage
+                ("The top movies are ...", None),  # answer stage
             ]
             mock_exec.side_effect = [
                 _mock_result("ERROR", error="Syntax error: unexpected token"),
@@ -64,9 +64,9 @@ class TestErrorRetry:
         ):
             mock_fallback.side_effect = [
                 ({"relevant_views": [], "reasoning": "ok"}, None),  # schema
-                ("SELECT 1", None),                                   # sql attempt 1
-                ("SELECT 1", None),                                   # sql retry
-                ("Sorry, unable to answer.", None),                   # answer
+                ("SELECT 1", None),  # sql attempt 1
+                ("SELECT 1", None),  # sql retry
+                ("Sorry, unable to answer.", None),  # answer
             ]
             mock_exec.side_effect = [
                 _mock_result("ERROR", error="First error"),
@@ -85,9 +85,9 @@ class TestEmptyNoRetry:
             patch("pwa.agent.pipeline.orchestrator.validate_and_execute_sql") as mock_exec,
         ):
             mock_fallback.side_effect = [
-                ({"relevant_views": [], "reasoning": "ok"}, None),    # schema
-                ("SELECT title FROM mart.v_movie WHERE 1=0", None),    # sql
-                ("No movies matched your criteria.", None),            # answer
+                ({"relevant_views": [], "reasoning": "ok"}, None),  # schema
+                ("SELECT title FROM mart.v_movie WHERE 1=0", None),  # sql
+                ("No movies matched your criteria.", None),  # answer
             ]
             mock_exec.return_value = _mock_result("EMPTY", error="Query executed successfully but returned 0 rows.")
 

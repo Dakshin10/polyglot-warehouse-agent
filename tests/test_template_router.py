@@ -84,6 +84,7 @@ def test_match_template_retains_fast_path_for_non_temporal_phrases():
 
 # ── avg_roi_by_genre: new cross-engine template ───────────────────────────────
 
+
 def test_match_template_avg_roi_by_genre_canonical():
     """Primary phrasing: 'average ROI by genre'."""
     q = "What is the average ROI by genre?"
@@ -120,13 +121,15 @@ def test_match_template_avg_roi_by_genre_performance():
 def test_avg_roi_by_genre_viz_router_gives_bar():
     """The genre breakdown result (1 cat + 1 numeric, 8-15 rows) must route to bar."""
     genres = ["Action", "Drama", "Comedy", "Horror", "Romance", "Thriller", "Animation", "Documentary"]
-    df = pd.DataFrame({
-        "primary_genre": genres,
-        "avg_roi": [3.1, 2.4, 2.8, 4.0, 1.9, 3.5, 5.2, 1.2],
-        "avg_revenue_usd": [2e8, 1.5e8, 1.2e8, 0.8e8, 0.9e8, 1.8e8, 3e8, 0.5e8],
-        "avg_budget_usd": [6e7, 5e7, 4e7, 2e7, 3e7, 5e7, 4e7, 1e7],
-        "movie_count": [450, 600, 550, 300, 350, 400, 200, 150],
-    })
+    df = pd.DataFrame(
+        {
+            "primary_genre": genres,
+            "avg_roi": [3.1, 2.4, 2.8, 4.0, 1.9, 3.5, 5.2, 1.2],
+            "avg_revenue_usd": [2e8, 1.5e8, 1.2e8, 0.8e8, 0.9e8, 1.8e8, 3e8, 0.5e8],
+            "avg_budget_usd": [6e7, 5e7, 4e7, 2e7, 3e7, 5e7, 4e7, 1e7],
+            "movie_count": [450, 600, 550, 300, 350, 400, 200, 150],
+        }
+    )
     # viz_router should pick avg_roi as y (first numeric col that isn't a datetime/year)
     viz = choose_visualization(df, "average ROI by genre")
     assert viz["type"] == "bar"
@@ -169,6 +172,7 @@ def test_avg_roi_by_genre_formatter_empty():
 
 # ─── Viz Recommendation tests for template match questions ────────────────────
 
+
 def test_template_match_viz_recommendations():
     """Verify viz recommendation types for the 3 core template-match questions."""
     from pwa.ui.viz_recommendation import build_from_shape
@@ -186,12 +190,13 @@ def test_template_match_viz_recommendations():
     assert rec_cast.primary.y_col == "avg_cast_size"
 
     # 3. top 5 highest-grossing movies -> 5 rows -> bar
-    df_top5 = pd.DataFrame([
-        {"rank": i, "title": f"Movie {i}", "revenue": (6 - i) * 1e8, "director_name": f"Director {i}"}
-        for i in range(1, 6)
-    ])
+    df_top5 = pd.DataFrame(
+        [
+            {"rank": i, "title": f"Movie {i}", "revenue": (6 - i) * 1e8, "director_name": f"Director {i}"}
+            for i in range(1, 6)
+        ]
+    )
     rec_top5 = build_from_shape(df_top5, "top 5 highest-grossing movies")
     assert rec_top5.primary.type == "bar"
     assert rec_top5.primary.x_col == "title"
     assert rec_top5.primary.y_col == "revenue"
-

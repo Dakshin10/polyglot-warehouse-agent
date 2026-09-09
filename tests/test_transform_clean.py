@@ -1,5 +1,10 @@
 import pandas as pd
-from pwa.preprocessing.movie_transform import extract_primary_genre, extract_production_country, parse_credits_info, safe_literal_eval
+from pwa.preprocessing.movie_transform import (
+    extract_primary_genre,
+    extract_production_country,
+    parse_credits_info,
+    safe_literal_eval,
+)
 
 
 def test_safe_literal_eval_malformed():

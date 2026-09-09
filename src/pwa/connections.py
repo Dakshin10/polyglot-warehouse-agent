@@ -49,7 +49,6 @@ def get_mysql_engine():
     db_uri = f"mysql+pymysql://{user}:{encoded_pwd}@{host}:{port}/{dbname}?charset=utf8mb4"
     root_uri = f"mysql+pymysql://{user}:{encoded_pwd}@{host}:{port}/defaultdb?charset=utf8mb4"
 
-
     try:
         root_engine = create_engine(root_uri, connect_args=connect_args, pool_pre_ping=True)
         with root_engine.connect() as conn:
@@ -164,6 +163,7 @@ def get_bq_client(project: str = "", location: str = "") -> bigquery.Client:
             bq_location = location or settings.bq_location
         except Exception:
             import os
+
             gcp_project = project or os.getenv("GCP_PROJECT", "salitsteel-502008")
             bq_location = location or os.getenv("BQ_LOCATION", "EU")
         return bigquery.Client(project=gcp_project, location=bq_location)
@@ -175,6 +175,7 @@ def get_bq_client(project: str = "", location: str = "") -> bigquery.Client:
             bq_location = settings.bq_location
         except Exception:
             import os
+
             gcp_project = os.getenv("GCP_PROJECT", "salitsteel-502008")
             bq_location = os.getenv("BQ_LOCATION", "EU")
         logger.debug("[BQ Client] Initialising singleton BigQuery client.")

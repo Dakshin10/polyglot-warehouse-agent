@@ -87,12 +87,14 @@ def cmd_all() -> int:
 def cmd_eval() -> int:
     """Run the golden regression evaluation suite."""
     from pwa.agent.pipeline.eval.run_eval import run_eval
+
     return run_eval()
 
 
 def cmd_benchmark(limit: int | None = None, fail_under: float | None = None) -> int:
     """Run the 50-query live benchmark harness."""
     from pwa.eval.benchmark import run_benchmark
+
     try:
         run_benchmark(limit=limit, fail_under=fail_under)
         return 0
@@ -106,6 +108,7 @@ def cmd_benchmark(limit: int | None = None, fail_under: float | None = None) -> 
 def cmd_perf(limit: int | None = None) -> int:
     """Run the multi-scenario performance & cost profiler."""
     from pwa.eval.performance import run_performance_suite
+
     try:
         run_performance_suite(limit=limit)
         return 0
@@ -117,6 +120,7 @@ def cmd_perf(limit: int | None = None) -> int:
 def cmd_refresh_rollups() -> int:
     """Recompute and materialize BigQuery rollup tables from mart views."""
     from pwa.rollups import refresh_rollups
+
     return 0 if refresh_rollups() else 1
 
 
@@ -194,7 +198,7 @@ def cmd_query(question: str, interactive: bool, model: str | None, verbose: bool
                 print(f"  bq execution     : {lats['exec']:.2f}s")
             if "answer" in lats:
                 print(f"  answer synthesis : {lats['answer']:.2f}s")
-            print(f"  " + "-" * 38)
+            print("  " + "-" * 38)
         print(f"  total wall time  : {elapsed:.2f}s")
         if hasattr(result, "stage_details") and result.stage_details and "routing_path" in result.stage_details:
             print(f"  routing path     : {result.stage_details['routing_path']}")
@@ -202,7 +206,7 @@ def cmd_query(question: str, interactive: bool, model: str | None, verbose: bool
             mb = result.bytes_scanned / 1_000_000
             print(f"  bytes scanned    : {mb:.1f} MB")
         if hasattr(result, "cache_hit") and result.cache_hit:
-            print(f"  cache hit        : yes")
+            print("  cache hit        : yes")
         print("-" * 52)
 
         if show_sql and hasattr(result, "sql") and result.sql:
