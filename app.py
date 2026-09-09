@@ -38,7 +38,13 @@ try:
 except Exception as _import_exc:
     _REAL_ORCHESTRATOR_AVAILABLE = False
     _IMPORT_ERROR = str(_import_exc)
-    PipelineResult = Any  # type: ignore[misc, assignment]
+
+    class PipelineResult:  # type: ignore[no-redef]
+        """Fallback PipelineResult dataclass for UI stub mode."""
+
+        def __init__(self, **kwargs: Any) -> None:
+            for k, v in kwargs.items():
+                setattr(self, k, v)
 
 
 def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResult:
