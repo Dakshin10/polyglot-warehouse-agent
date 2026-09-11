@@ -1,8 +1,8 @@
 """Golden regression evaluation runner for the PWA NL→SQL pipeline.
 
 Usage:
-    python -m pwa.agent.pipeline.eval.run_eval
-    pwa eval  (if CLI sub-command is wired)
+    python -m pwa.eval.run_eval
+    pwa eval  (via CLI sub-command)
 
 Exit code: 0 if all entries pass, 1 if any fail.
 
@@ -20,7 +20,7 @@ import sys
 import time
 from typing import Any
 
-logger = logging.getLogger("pwa.agent.pipeline.eval.run_eval")
+logger = logging.getLogger("pwa.eval.run_eval")
 
 _GOLDEN_PATH = pathlib.Path(__file__).parent / "golden_set.json"
 

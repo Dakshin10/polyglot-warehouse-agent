@@ -68,7 +68,10 @@ def _render_chart_for_spec(
                 st.scatter_chart(df)
 
         elif spec_type == "table":
-            st.dataframe(df, use_container_width=True)
+            try:
+                st.dataframe(df, use_container_width=True)
+            except Exception:
+                st.table(df)
 
     except Exception as exc:
         # Chart rendering is best-effort; never crash the UI

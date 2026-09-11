@@ -77,7 +77,10 @@ def render_evidence_panel(
         with st.expander(f"Results table ({row_count} rows)", expanded=False):
             if rows:
                 df = pd.DataFrame(rows)
-                st.dataframe(df, width="stretch")
+                try:
+                    st.dataframe(df, width="stretch")
+                except Exception:
+                    st.table(df)
             else:
                 st.markdown(
                     "<div class='pwa-quiet-meta'>No rows returned.</div>",

@@ -147,6 +147,22 @@ pwa query "Find all movies tagged with the keyword 'space travel' and show their
 
 ---
 
+## 📊 Cross-Engine Queries & Automated Visualizations
+
+The platform automatically translates cross-engine questions joining **Aiven MySQL** (`mart.v_movie`) and **Cloud SQL PostgreSQL** (`mart.v_movie_credits`) into interactive chart visualizations in Streamlit (`app.py`) and CLI (`pwa query`):
+
+| Visualization Type | Example Natural Language Question | Description & Cross-Engine Join |
+| :--- | :--- | :--- |
+| **📊 Bar Chart** | `"Which director has the highest average ROI across their movies?"` | Director ROI ranking (MySQL financials $\times$ PostgreSQL credits) |
+| **📊 Bar Chart** | `"Show top 10 lead actors by total box office revenue"` | Lead actor revenue rollup (MySQL revenue $\times$ PostgreSQL cast) |
+| **📈 Line Chart** | `"Show the average cast size by release year over time"` | Time-series trend of cast size over release years |
+| **🔵 Scatter Plot** | `"Compare budget versus revenue for action movies with cast size over 15"` | Budget vs Revenue correlation plot filtered by cast size |
+| **🔢 Metric Card** | `"What is the average cast size for movies that earned over 500 million dollars?"` | Single aggregate metric calculation over revenue threshold |
+ 
+
+
+---
+
 ## 📚 Technical Documentation & Deep Dives
 
 - [Architecture & Design Guide](docs/architecture.md) — System topology, cross-engine federation strategy, and schema design

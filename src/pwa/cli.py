@@ -86,9 +86,10 @@ def cmd_all() -> int:
 
 def cmd_eval() -> int:
     """Run the golden regression evaluation suite."""
-    from pwa.agent.pipeline.eval.run_eval import run_eval
+    from pwa.eval.run_eval import run_eval
 
     return run_eval()
+
 
 
 def cmd_benchmark(limit: int | None = None, fail_under: float | None = None) -> int:
