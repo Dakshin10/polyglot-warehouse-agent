@@ -150,7 +150,7 @@ def render_report_view(report_data: dict[str, Any]) -> None:
 
     if rows:
         df = pd.DataFrame(rows)
-        render_viz_panel(df, viz_rec, msg_idx=999, question=question)
+        render_viz_panel(df, viz_rec, msg_idx=999, question=question, auto_confirm=True)
 
     st.divider()
 

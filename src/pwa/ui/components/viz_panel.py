@@ -110,8 +110,9 @@ def render_viz_panel(
     recommendation_dict: dict | None,
     msg_idx: int,
     question: str = "",
+    auto_confirm: bool = False,
 ) -> None:
-    """Render primary chart + reason caption + instant alternative type-switcher.
+    """Render HITL visualization recommendation banner + primary chart once confirmed.
 
     Args:
         df:                  The result DataFrame (already fetched, no new query).
@@ -120,6 +121,7 @@ def render_viz_panel(
         msg_idx:             Stable message index from the ``enumerate`` loop in
                              ``app.py``; used as the ``session_state`` key.
         question:            Original question (used only for shape-fallback).
+        auto_confirm:        If True, bypasses HITL prompt and renders graph directly.
     """
     if df is None or df.empty:
         return
@@ -139,13 +141,59 @@ def render_viz_panel(
     # Build flat list: index 0 = primary, 1..n = alternatives
     all_specs: list[dict] = [primary_d] + list(alternatives_d)
 
-    # ── Session state ─────────────────────────────────────────────────────────
+    primary_type = primary_d.get("type", "table")
+
+    # Only offer graph generation HITL prompt for actual chart/graph types (bar, line, scatter)
+    is_graph_type = primary_type in ("bar", "line", "scatter")
+    if not is_graph_type and not auto_confirm:
+        return
+
+    # ── HITL Confirmation State ───────────────────────────────────────────────
+    confirm_key = f"viz_confirmed_{msg_idx}"
+    if auto_confirm:
+        st.session_state[confirm_key] = True
+    elif confirm_key not in st.session_state:
+        st.session_state[confirm_key] = False
+
+    # Check if user has confirmed graph generation
+    if not st.session_state[confirm_key]:
+        primary_label = _TYPE_LABELS.get(primary_type, primary_type.title())
+        primary_icon = _TYPE_ICONS.get(primary_type, "📊")
+        reason = primary_d.get("reason", "")
+
+        # HITL recommendation banner for graphs
+        st.markdown(
+            f"""
+            <div style="background: rgba(13, 110, 253, 0.04); border: 1px dashed rgba(13, 110, 253, 0.3); border-radius: 10px; padding: 0.85rem 1.15rem; margin-bottom: 0.75rem;">
+                <div style="font-weight: 600; font-size: 0.92rem; color: var(--pwa-text-primary); margin-bottom: 0.25rem;">
+                    💡 Graph Visualization Recommended: <span style="color: #0d6efd;">{primary_icon} {primary_label}</span>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--pwa-text-secondary);">
+                    {reason or f"The AI detected that this data is best visualized using a {primary_label}."}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        col_conf, _ = st.columns([1, 1])
+        with col_conf:
+            if st.button(
+                f"{primary_icon} Generate {primary_label}",
+                key=f"btn_confirm_viz_{msg_idx}",
+                help="Click to generate and view this graph visualization (Human-in-the-loop confirmation)",
+            ):
+                st.session_state[confirm_key] = True
+                st.rerun()
+        return
+
+    # ── Session state for chart selection ─────────────────────────────────────
     state_key = f"viz_sel_{msg_idx}"
     if state_key not in st.session_state:
         st.session_state[state_key] = 0  # default to primary
 
     active_idx: int = st.session_state[state_key]
-    # Guard against stale index (e.g. if alternatives changed between sessions)
+    # Guard against stale index
     if active_idx >= len(all_specs):
         active_idx = 0
         st.session_state[state_key] = 0
@@ -162,19 +210,23 @@ def render_viz_panel(
 
     _render_chart_for_spec(df, spec_type, x_col, y_col)
 
-    # ── Alternative switcher buttons ──────────────────────────────────────────
-    if len(all_specs) > 1:
-        cols = st.columns(len(all_specs))
-        for i, (col, spec) in enumerate(zip(cols, all_specs)):
-            stype = spec.get("type", "table")
-            label = _btn_label(stype)
-            is_active = i == active_idx
-            btn_key = f"viz_btn_{msg_idx}_{i}"
-            with col:
-                if is_active:
-                    # Show the active button as disabled with a checkmark
-                    st.button(f"✓ {label}", key=btn_key, disabled=True)
-                else:
-                    if st.button(label, key=btn_key):
-                        st.session_state[state_key] = i
-                        st.rerun()
+    # ── Alternative switcher buttons + Hide button ───────────────────────────
+    num_btns = len(all_specs) + 1
+    cols = st.columns(num_btns)
+    for i, (col, spec) in enumerate(zip(cols[: len(all_specs)], all_specs)):
+        stype = spec.get("type", "table")
+        label = _btn_label(stype)
+        is_active = i == active_idx
+        btn_key = f"viz_btn_{msg_idx}_{i}"
+        with col:
+            if is_active:
+                st.button(f"✓ {label}", key=btn_key, disabled=True)
+            else:
+                if st.button(label, key=btn_key):
+                    st.session_state[state_key] = i
+                    st.rerun()
+
+    with cols[-1]:
+        if st.button("🙈 Hide graph", key=f"btn_hide_viz_{msg_idx}", help="Hide visualization"):
+            st.session_state[confirm_key] = False
+            st.rerun()
