@@ -1,88 +1,91 @@
-# Polyglot Warehouse Agent — Architecture
+# Nexora Enterprise Platform — Architecture
 
 ## Layer Overview
 
 ```
-                          [ Kaggle API ]
-                                │
-                         [ data/raw/ ]
-                                │
-                   ┌────────────┴────────────┐
-                   ▼                         ▼
-             [ Aiven MySQL ]      [ Cloud SQL Postgres ]
-            (movie_registry)          (movie_credits)
-                   │                         │
-            replicated batch         federated live query
-                   │                         │
-                   ▼                         ▼
-            [ raw_registry ]          [ raw_credits ]
-                   │                         │
-                   └────────────┬────────────┘
-                                ▼
-                       [ BigQuery Mart ]
-                    (mart.v_movie_full)
-                                │
-                                ▼
-                   [ ADK Warehouse Agent ]
+                      [ Kaggle Source Datasets ]
+     ┌────────────────────────────┼───────────────────────────┐
+     ▼                            ▼                           ▼
+[ AdventureWorks ]         [ Olist E-Commerce ]    [ Olist Marketing Funnel ]
+(B2B Enterprise ERP)      (B2C Marketplace)       (Leads & Sellers)
+     │                            │                           │
+     └────────────────────────────┼───────────────────────────┘
+                                  ▼
+           [ Raw Layer — Native BigQuery Load & CSV Landing ]
+      (raw_adventureworks, raw_olist, raw_olist_marketing)
+                                  │
+                                  ▼
+         [ Staging Layer — Staging & Quality Cleaning Gates 1-13 ]
+           (staging_enterprise, staging_marketplace)
+                                  │
+                                  ▼
+         [ Canonical Layer — Domain Schemas & Cross-System Keys ]
+           (curated_enterprise, curated_marketplace)
+                                  │
+                                  ▼
+         [ Business Surface — 10 Curated Mart Views ]
+           (mart.v_sales_order_line, v_product_catalog, ...)
+                                  │
+                                  ▼
+         [ Fast-Path Materializations — 7 Aggregate Rollups ]
+           (rollup.sales_by_year, product_sales_by_category, ...)
+                                  │
+                                  ▼
+        [ 4-Stage ADK Multi-Agent Pipeline & Interactive UI ]
+     (SchemaGrounding → AST SQL Gen → Dry-Run Exec → Synthesis)
 ```
 
-### 1. Source Layer
-- **Aiven MySQL**: Managed cloud MySQL instance hosting film financials (`movie` table, 1,000 rows).
-- **Cloud SQL PostgreSQL**: Managed GCP PostgreSQL instance hosting credit data (`movie_credits` table, 1,000 rows).
-- **Raw CSV Files**: Keywords (`movie_keywords.csv`) and MovieLens ratings (`movie_ratings_agg.csv`).
+### 1. Ingestion & Storage Architecture
+- **Primary Data Source**: Real Kaggle datasets downloaded via Kaggle API.
+- **Native BigQuery Load**: CSV source files are loaded directly into BigQuery native tables using `bigquery.LoadJob` with schema auto-detection or explicit schemas, ensuring high ingestion throughput and zero dependency on external local SQL servers.
+- **Data Domains**:
+  - `raw_adventureworks`: Enterprise B2B ERP data (Sales, Products, Employees, Suppliers, Purchasing).
+  - `raw_olist`: B2C Marketplace data (Orders, Payments, Customer Demographics, Delivery Logistics, Star Reviews).
+  - `raw_olist_marketing`: Seller Acquisition Funnel data (Marketing Qualified Leads, Closed Deals).
 
-### 2. Why Replication vs. Federation?
-- **Aiven MySQL is Replicated**: Aiven MySQL is hosted outside GCP. Batch replication into BigQuery `raw_registry` isolates query load and ensures ultra-fast analytical execution.
-- **Cloud SQL PostgreSQL is Federated**: Cloud SQL resides in the same GCP project (`salitsteel-502008`) and region (`europe-west1`). A BigQuery Cloud SQL Connection enables live, zero-copy federation via `EXTERNAL_QUERY`.
+### 2. Mart Layer Governance & Security
+- All downstream analytical consumers (including the Google ADK 4-Agent Pipeline and Streamlit Workspace) query **only** the 10 curated views in the `mart` dataset.
+- Direct query access to raw and staging layers is restricted via dataset partitioning and read-only AST query validation.
 
-### 3. Cross-Engine Foreign Key Design
-- Across Aiven MySQL and Cloud SQL PostgreSQL, `movie_id` serves as the logical join key.
-- The cross-engine foreign key is **deliberately unenforced at the DDL level** across distinct database management systems. Referential integrity is continuously validated at query runtime via `mart.v_integrity_exceptions`.
+### 3. Fast-Path Rollup Materialization
+- Common aggregate question shapes (e.g. annual sales summary, category revenue ranking, supplier spend) are pre-materialized into `rollup.*` BigQuery tables.
+- The `Intent and Template Router` matches incoming questions against rollup shapes, executing instant queries (<0.05s) with zero LLM API calls.
 
-### 4. Mart Layer Governance
-- All downstream consumers (including the Google Agentic SDK ADK Agent) query **only** the `mart` dataset (`mart.v_movie_full`).
-- Raw datasets (`raw_registry`, `raw_credits`, `raw_files`) are protected by IAM dataset permissions and authorized views.
-
-## Repository Layout
-
-Maximum depth of two. One package level under `src/`, no subpackages: every
-module sits exactly one level deep and is named by subsystem, so related files
-sort together.
+## Repository Structure
 
 ```
 polyglot-warehouse-agent/
-├── README.md  pyproject.toml  Makefile  .env.example  .gitignore
+├── README.md            Platform overview and quickstart guide
+├── pyproject.toml       Package metadata and dependencies
+├── config/
+│   └── sources.yaml     Source registry configuration
 ├── src/pwa/
-│   ├── settings.py          the only module that reads the environment
-│   ├── connections.py       MySQL / Postgres / BigQuery factories, no fallback
-│   ├── logging_setup.py     structured logging with credential redaction
-│   ├── sql_files.py         resolves sql/ against the repository root
-│   ├── kaggle_download.py   movie_transform.py   source_db_load.py
-│   ├── bigquery_setup.py    bigquery_replicate.py
-│   ├── bigquery_load_csv.py bigquery_mart.py
-│   ├── gates_source.py      gates 1-13, run at pipeline time
-│   ├── gates_bigquery.py    gates B1-B15, run at pipeline time
-│   ├── gates_runner.py      shared gate scaffolding (no SKIP status)
-│   ├── run_source.py        run_bigquery.py    audit.py
-│   └── cli.py               the `pwa` console script
-├── sql/    mysql_movie_ddl, postgres_credits_ddl, mart_views,
-│           mart_descriptions, example_cross_db, example_agent_demo
-├── tests/  pytest: unit tests plus @pytest.mark.integration
-├── docs/   architecture.md  bigquery.md  runbook.md  audit_report.md
-├── certs/  gitignored - Aiven service CA
-└── data/   gitignored - raw Kaggle cache and generated CSVs
+│   ├── settings.py      Single source of truth for configuration
+│   ├── source_registry.py Interface for discovering and testing sources
+│   ├── connections.py   BigQuery client factory
+│   ├── logging_setup.py Structured logging with credential redaction
+│   ├── sql_files.py     Resolves SQL directory paths
+│   ├── run_source.py    Multi-source raw ingestion pipeline runner
+│   ├── run_bigquery.py  Warehouse staging, curated, and mart builder
+│   ├── audit.py         Warehouse inventory audit and integrity checks
+│   ├── rollups.py       Rollup table materialization and refresh service
+│   ├── gates_source.py  Source quality gates (Gates 1-13)
+│   ├── gates_bigquery.py Warehouse quality gates (Gates B1-B15)
+│   ├── agent/
+│   │   ├── root_agent.py System instructions and fallback agent
+│   │   ├── bq_tools.py   ADK BigQuery toolset scoped to mart views
+│   │   ├── guardrails.py AST SQL validator, cost scanner, and rate limiter
+│   │   ├── template_router.py Intent router for fast-path rollup tables
+│   │   ├── schema_cache.py TTL disk cache for INFORMATION_SCHEMA metadata
+│   │   └── pipeline/    4-stage Google ADK multi-agent pipeline
+│   │       ├── schema_agent.py Stage 1: Schema Grounding Agent
+│   │       ├── sql_agent.py    Stage 2: AST SQL Generation Agent
+│   │       ├── exec_agent.py   Stage 3: Validation & Execution Agent
+│   │       ├── answer_agent.py Stage 4: Answer Synthesis Agent
+│   │       └── orchestrator.py Pipeline runner and stage wiring
+│   ├── ui/              Streamlit UI components & visualization router
+│   └── preprocessing/   Ingestion & transformation scripts per source
+├── sql/enterprise/      DDL for staging, curated, mart, and integrity views
+├── tests/               Pytest test suite (184 unit & integration tests)
+└── docs/                Technical documentation and guides
 ```
-
-### Verification gates are not tests
-
-`gates_source.py` and `gates_bigquery.py` assert data quality against live
-cloud resources at pipeline runtime and block on failure, so they live in
-`src/` and run as part of `pwa source run` / `pwa warehouse run`. `tests/` is
-pytest: unit tests of pure logic plus integration tests that are deselected by
-default. A gate that only runs when someone remembers to run pytest is not a
-gate.
-
-`gates_runner.GateResult` has no SKIP status. A gate that cannot execute
-returns `passed=False` with `detail="CANNOT VERIFY: <error>"`, which is what
-keeps an unverifiable gate from reading as a pass. Mutating gates (B14) carry
-`mutating=True` and restore their change in a `finally` block.

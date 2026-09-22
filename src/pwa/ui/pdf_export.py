@@ -107,6 +107,16 @@ def generate_report_pdf(
 
     # Results Table
     if rows and len(rows) > 0:
+        try:
+            import pandas as pd
+            from pwa.governance.pii import mask_dataframe_pii
+
+            df_export = pd.DataFrame(rows)
+            df_export = mask_dataframe_pii(df_export)
+            rows = df_export.to_dict(orient="records")
+        except Exception:
+            pass
+
         pdf.set_font("Helvetica", "B", 10)
         pdf.set_text_color(40, 40, 40)
         pdf.cell(0, 6, f"Full Results Table ({len(rows)} rows):")

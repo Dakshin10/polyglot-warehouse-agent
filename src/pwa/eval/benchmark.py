@@ -72,20 +72,27 @@ def evaluate_query_conditions(
     return True, "none", ""
 
 
-def evaluate_expected_check(entry: Dict[str, Any], result: PipelineResult) -> bool:
-    """Evaluate optional expected_check assertion if present."""
+def evaluate_expected_check(entry: Dict[str, Any], result: str | PipelineResult) -> bool:
+    """Evaluate optional expected_check assertion if present.
+
+    Accepts both a PipelineResult (the normal case) and a plain error/refusal
+    string (e.g. a guardrail refusal) — a failed pipeline stage can still be
+    the *expected* outcome (a query that should be refused or ask for
+    clarification), so this must not be skipped just because `is_pass` is False.
+    """
     check = entry.get("expected_check")
     if not check:
         return True
 
     check_type = check.get("type")
     val = check.get("value")
-    answer = (result.answer or "").lower()
+    answer = result if isinstance(result, str) else (result.answer or "")
+    answer = answer.lower()
 
     if check_type == "answer_contains" and val:
         return val.lower() in answer
     elif check_type == "non_empty":
-        return bool(result.answer and result.answer.strip())
+        return bool(answer.strip())
 
     return True
 
@@ -132,7 +139,7 @@ def run_benchmark(
         latency_ms = round((time.perf_counter() - t0_q) * 1000, 1)
 
         is_pass, failed_at_stage, error_msg = evaluate_query_conditions(entry, res)
-        expected_match = evaluate_expected_check(entry, res) if is_pass and isinstance(res, PipelineResult) else False
+        expected_match = evaluate_expected_check(entry, res)
 
         if is_pass:
             passed_count += 1

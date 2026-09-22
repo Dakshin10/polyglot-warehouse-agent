@@ -22,10 +22,15 @@ logger = logging.getLogger("pwa.agent.bq_tools")
 
 # Strict surface of allowed read-only mart views
 ALLOWED_MART_VIEWS: set[str] = {
-    "mart.v_movie",
-    "mart.v_movie_credits",
-    "mart.v_movie_keywords",
-    "mart.v_movie_full",
+    "mart.v_sales_order_line",
+    "mart.v_product_catalog",
+    "mart.v_customer_360",
+    "mart.v_employee_directory",
+    "mart.v_supplier_performance",
+    "mart.v_marketplace_order_summary",
+    "mart.v_marketplace_delivery_performance",
+    "mart.v_marketplace_review_sentiment",
+    "mart.v_marketplace_marketing_funnel",
     "mart.v_integrity_exceptions",
 }
 
@@ -65,7 +70,10 @@ def get_mart_credentials_config() -> BigQueryCredentialsConfig:
 
 def get_mart_tool_config() -> BigQueryToolConfig:
     """Create ADK BigQueryToolConfig with WriteMode.BLOCKED strictly enforced."""
-    project_id = "salitsteel-502008"
+    # No hardcoded real-project fallback on purpose: if settings fail to load,
+    # this should visibly misconfigure (and fail loudly downstream) rather
+    # than silently querying whatever project happened to be hardcoded here.
+    project_id = "GCP_PROJECT_NOT_CONFIGURED"
     location = "EU"
     try:
         settings = get_settings()
@@ -101,15 +109,26 @@ def schema_snapshot(
         client = get_bq_client()
 
     if not project_id or not dataset:
-        try:
-            settings = get_settings()
-            project_id = project_id or settings.gcp_project
-            dataset = dataset or settings.bq_ds_mart
-        except Exception:
-            project_id = project_id or getattr(client, "project", "salitsteel-502008")
-            dataset = dataset or "mart"
+        # No hardcoded project fallback here on purpose: a settings failure should
+        # surface as an error to the caller (build_system_instruction already
+        # catches and degrades gracefully), not silently point at a specific
+        # real GCP project nobody chose for this run.
+        settings = get_settings()
+        project_id = project_id or settings.gcp_project
+        dataset = dataset or settings.bq_ds_mart
 
-    mart_view_names = ["v_movie", "v_movie_credits", "v_movie_keywords", "v_movie_full", "v_integrity_exceptions"]
+    mart_view_names = [
+        "v_sales_order_line",
+        "v_product_catalog",
+        "v_customer_360",
+        "v_employee_directory",
+        "v_supplier_performance",
+        "v_marketplace_order_summary",
+        "v_marketplace_delivery_performance",
+        "v_marketplace_review_sentiment",
+        "v_marketplace_marketing_funnel",
+        "v_integrity_exceptions",
+    ]
 
     view_list_str = ", ".join(repr(v) for v in mart_view_names)
     # Use INFORMATION_SCHEMA.COLUMNS which is standard across all BigQuery datasets

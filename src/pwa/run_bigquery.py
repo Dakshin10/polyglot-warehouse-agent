@@ -1,41 +1,82 @@
-"""Warehouse pipeline: setup -> land -> mart -> gates B1-B15."""
+"""Warehouse pipeline — Nexora Enterprise Platform.
+
+Flow:
+  BigQuery setup → metadata setup → staging → curated → mart views → gates B1-B15
+"""
 
 import logging
-
-from pwa.gates_bigquery import run_all_bq_gates
-from pwa.preprocessing import build_mart, load_csvs, replicate_mysql, run_setup
-
 
 logger = logging.getLogger("pwa.run_bigquery")
 
 
 def run_warehouse_pipeline() -> bool:
-    """Run the BigQuery landing and mart build end to end. Returns True only if gates B1-B15 all passed."""
-    logger.info("=========================================================")
-    logger.info("   STARTING BIGQUERY LANDING + MART PIPELINE             ")
-    logger.info("=========================================================")
+    """Run the BigQuery warehouse pipeline end to end.
 
-    logger.info("---> STEP 1: BIGQUERY SETUP (datasets, connection, IAM)")
-    run_setup()
+    Returns True only if all pipeline stages succeeded and gates B1-B15 passed.
+    """
+    from pwa.preprocessing.bigquery_setup import run_setup
+    from pwa.preprocessing.pwa_metadata_setup import run_metadata_setup
+    from pwa.preprocessing.bigquery_mart import build_mart
+    from pwa.gates_bigquery import run_all_bq_gates
 
-    logger.info("---> STEP 2: REPLICATE AIVEN MYSQL -> raw_registry.movie")
-    replicate_mysql()
+    logger.info("=" * 65)
+    logger.info("   NEXORA BIGQUERY WAREHOUSE PIPELINE STARTING              ")
+    logger.info("=" * 65)
 
-    logger.info("---> STEP 3: LOAD CSVs -> raw_files")
-    load_csvs()
+    passed = True
 
-    logger.info("---> STEP 4: BUILD MART LAYER")
-    build_mart()
+    logger.info("---> STEP 1: BIGQUERY INFRASTRUCTURE SETUP (datasets, IAM)")
+    try:
+        run_setup()
+    except Exception as exc:
+        logger.error(f"BigQuery setup failed: {exc}")
+        passed = False
 
-    logger.info("---> STEP 5: BIGQUERY VERIFICATION GATES B1-B15")
-    passed = run_all_bq_gates()
-
-    logger.info("=========================================================")
     if passed:
-        logger.info("   BIGQUERY PIPELINE COMPLETED SUCCESSFULLY (EXIT 0)     ")
+        logger.info("---> STEP 2: METADATA CONTROL PLANE SETUP")
+        try:
+            run_metadata_setup()
+        except Exception as exc:
+            logger.error(f"Metadata setup failed: {exc}")
+            passed = False
+
+    if passed:
+        logger.info("---> STEP 3: BUILD MART VIEWS (curated enterprise + marketplace)")
+        try:
+            build_mart()
+        except Exception as exc:
+            logger.error(f"Mart build failed: {exc}")
+            passed = False
+
+    if passed:
+        logger.info("---> STEP 4: BIGQUERY VERIFICATION GATES B1-B15")
+        try:
+            passed = run_all_bq_gates()
+        except Exception as exc:
+            logger.error(f"BigQuery gates raised exception: {exc}")
+            passed = False
+
+    logger.info("=" * 65)
+    if passed:
+        logger.info("   BIGQUERY PIPELINE COMPLETED SUCCESSFULLY (EXIT 0)      ")
     else:
-        logger.error("   BIGQUERY PIPELINE FAILED: GATES DID NOT PASS (EXIT 1) ")
-    logger.info("=========================================================")
+        logger.error("   BIGQUERY PIPELINE FAILED: GATES OR STAGES DID NOT PASS (EXIT 1) ")
+        try:
+            from pwa.observability.alerting import PipelineAlert, default_alert_sinks
+
+            default_alert_sinks().send(
+                PipelineAlert(
+                    alert_type="PIPELINE_FAILURE",
+                    severity="CRITICAL",
+                    source_id="warehouse_pipeline",
+                    table_name=None,
+                    message="Warehouse build or BigQuery verification gates B1-B15 failed.",
+                )
+            )
+        except Exception as alert_exc:
+            logger.warning(f"Failed to dispatch warehouse failure alert: {alert_exc}")
+    logger.info("=" * 65)
+
     return passed
 
 

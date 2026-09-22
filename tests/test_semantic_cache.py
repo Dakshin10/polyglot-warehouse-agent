@@ -107,3 +107,67 @@ class TestCacheClear:
         cache.clear()
         assert len(cache._entries) == 0
         assert cache.get("q1") is None
+
+
+class TestRedisBacking:
+    """PWA_REDIS_URL unset (the default) must never touch redis at all."""
+
+    def test_no_redis_url_never_imports_redis(self, cache, monkeypatch):
+        monkeypatch.delenv("PWA_REDIS_URL", raising=False)
+        cache.put("q1", "a1")
+        assert cache.get("q1") == "a1"
+        assert cache._redis is None
+
+    def test_put_writes_through_to_redis(self, monkeypatch):
+        import sys
+        import types
+
+        mock_redis_module = types.ModuleType("redis")
+        mock_client = __import__("unittest.mock", fromlist=["MagicMock"]).MagicMock()
+        mock_redis_module.from_url = lambda *a, **k: mock_client  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "redis", mock_redis_module)
+        monkeypatch.setenv("PWA_REDIS_URL", "redis://localhost:6379/0")
+
+        cache = SemanticCache(max_entries=10, ttl_seconds=300.0, similarity_threshold=0.92)
+        mock_client.hvals.return_value = []
+        cache.put("what is total revenue", "42")
+
+        mock_client.hset.assert_called_once()
+        args = mock_client.hset.call_args
+        assert args[0][0] == "pwa:semantic_cache"
+        mock_client.expire.assert_called_once()
+
+    def test_get_syncs_entries_written_by_another_replica(self, monkeypatch):
+        import json
+        import sys
+        import types
+
+        mock_redis_module = types.ModuleType("redis")
+        mock_client = __import__("unittest.mock", fromlist=["MagicMock"]).MagicMock()
+        mock_redis_module.from_url = lambda *a, **k: mock_client  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "redis", mock_redis_module)
+        monkeypatch.setenv("PWA_REDIS_URL", "redis://localhost:6379/0")
+
+        cache = SemanticCache(max_entries=10, ttl_seconds=300.0, similarity_threshold=0.92)
+        remote_entry = json.dumps({"question": "what is total revenue", "answer": "42", "ts": time.time()})
+        mock_client.hvals.return_value = [remote_entry]
+
+        # Never written locally, but should be visible via the Redis sync in get().
+        assert cache.get("what is total revenue") == "42"
+
+    def test_falls_back_gracefully_when_redis_connection_fails(self, monkeypatch):
+        import sys
+        import types
+
+        mock_redis_module = types.ModuleType("redis")
+
+        def _boom(*a, **k):
+            raise ConnectionError("no route to host")
+
+        mock_redis_module.from_url = _boom  # type: ignore[attr-defined]
+        monkeypatch.setitem(sys.modules, "redis", mock_redis_module)
+        monkeypatch.setenv("PWA_REDIS_URL", "redis://unreachable:6379/0")
+
+        cache = SemanticCache(max_entries=10, ttl_seconds=300.0, similarity_threshold=0.92)
+        cache.put("q1", "a1")  # must not raise
+        assert cache.get("q1") == "a1"  # local-only fallback still works

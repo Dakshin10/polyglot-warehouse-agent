@@ -1,52 +1,102 @@
-"""Single source of truth for configuration.
+"""Single source of truth for configuration — Nexora Technologies Enterprise Platform.
 
 Every environment variable the project reads is read here and nowhere else.
 Validation collects *all* problems and raises once, listing them together, so a
 misconfigured environment is fixed in one pass instead of one variable per run.
+
+MySQL and PostgreSQL connections are retained as optional (not required by the
+primary ingestion pipeline which uses BigQuery native tables). They can be
+enabled for future live-source connectors.
 """
 
 import os
 import re
 from pathlib import Path
-from typing import Literal
 from dataclasses import dataclass, fields
 from dotenv import load_dotenv
 
 SECRET_FIELD_MARKERS = ("password", "key", "secret", "token")
 
-# A value is a forbidden local-file database target if it is a sqlite URL or
-# points at a local database file. Matching on the whole value (not a bare
-# substring) keeps unrelated variables that merely contain ".db" from failing
-# the whole configuration.
-_SQLITE_TARGET = re.compile(r"^sqlite(\+\w+)?://|\.(db|sqlite|sqlite3)$", re.IGNORECASE)
+_SQLITE_TARGET = re.compile(r"^sqlite(\+\w+)?://|\.( db|sqlite|sqlite3)$", re.IGNORECASE)
+
+# Repository root (two levels above this file: src/pwa/settings.py → repo root)
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
-def _normalize_region(region: str) -> str:
-    """Map a Cloud SQL region to the BigQuery multi-region that covers it."""
-    region_lower = region.lower().strip()
-    if region_lower.startswith("europe-west") or region_lower.startswith("europe-north"):
-        return "EU"
-    if region_lower.startswith("us-") or region_lower.startswith("northamerica-"):
-        return "US"
-    return region_lower.upper()
+class ProductionEnvironmentError(RuntimeError):
+    """Raised when production environment rules are violated (e.g. mock fallbacks in production)."""
+
+    pass
 
 
 @dataclass(frozen=True)
 class Settings:
-    # Kaggle
+    # ------------------------------------------------------------------
+    # Environment Mode (development | testing | production)
+    # ------------------------------------------------------------------
+    pwa_env: str
+
+    @property
+    def is_production(self) -> bool:
+        return self.pwa_env.lower() == "production"
+
+    @property
+    def is_testing(self) -> bool:
+        return self.pwa_env.lower() in ("testing", "test")
+
+    @property
+    def is_development(self) -> bool:
+        return self.pwa_env.lower() in ("development", "dev")
+
+    # ------------------------------------------------------------------
+    # Kaggle credentials
+    # ------------------------------------------------------------------
     kaggle_username: str
     kaggle_key: str
 
-    # Aiven MySQL
+    # ------------------------------------------------------------------
+    # Google Cloud Platform / BigQuery (required)
+    # ------------------------------------------------------------------
+    gcp_project: str
+    bq_location: str
+
+    # BigQuery dataset names — raw layer
+    bq_ds_raw_aw: str  # raw_adventureworks
+    bq_ds_raw_olist: str  # raw_olist
+    bq_ds_raw_marketing: str  # raw_olist_marketing
+
+    # BigQuery dataset names — staging layer
+    bq_ds_staging_ent: str  # staging_enterprise
+    bq_ds_staging_mkt: str  # staging_marketplace
+
+    # BigQuery dataset names — curated layer
+    bq_ds_curated_ent: str  # curated_enterprise
+    bq_ds_curated_mkt: str  # curated_marketplace
+
+    # BigQuery dataset name — control plane / metadata
+    bq_ds_metadata: str  # pwa_metadata
+
+    # BigQuery dataset name — rollup / fast-path materializations
+    bq_ds_rollup: str  # rollup
+
+    # BigQuery dataset name — governed business-surface mart views
+    bq_ds_mart: str  # mart
+
+    # ------------------------------------------------------------------
+    # Optional: Aiven MySQL (not required by primary ingestion pipeline)
+    # ------------------------------------------------------------------
     mysql_host: str
     mysql_port: int
     mysql_user: str
     mysql_password: str
     mysql_db: str
     mysql_ssl_ca: Path
+    mysql_enabled: bool  # True only if host+password are configured
 
-    # Cloud SQL Postgres
-    pg_connect_mode: Literal["direct", "connector"]
+    # ------------------------------------------------------------------
+    # Optional: Cloud SQL PostgreSQL (not required by primary ingestion pipeline)
+    # ------------------------------------------------------------------
+    pg_connect_mode: str
     pg_host: str
     pg_port: int
     pg_user: str
@@ -55,19 +105,20 @@ class Settings:
     pg_instance_connection_name: str
     pg_bq_reader_user: str
     pg_bq_reader_password: str
+    pg_enabled: bool  # True only if instance_connection_name+password configured
 
-    # BigQuery
-    gcp_project: str
-    bq_location: str
+    # BigQuery connection ID for Cloud SQL federation (optional)
     bq_connection_id: str
-    bq_ds_registry: str
-    bq_ds_credits: str
-    bq_ds_files: str
-    bq_ds_mart: str
+
+    # ------------------------------------------------------------------
+    # Local paths
+    # ------------------------------------------------------------------
+    source_base_dir: Path  # data/source/
+    manifest_dir: Path  # data/manifests/
 
     @classmethod
     def from_env(cls, env_file: str | None = None) -> "Settings":
-        """Load settings from the environment and validate every rule, reporting all failures at once."""
+        """Load settings from the environment and validate, reporting all failures at once."""
         if env_file:
             load_dotenv(env_file)
         else:
@@ -78,101 +129,85 @@ class Settings:
         def get_val(key: str, default: str = "") -> str:
             return os.getenv(key, default).strip()
 
-        # Rule 6: no setting may point at a .db / .sqlite / sqlite:// target.
+        # Reject SQLite targets throughout (this is a cloud-native platform)
         for key, val in os.environ.items():
             if val and _SQLITE_TARGET.search(val.strip()):
                 errors.append(
-                    f"SQLite target forbidden in setting {key}='{val}' (this project has no local-file store)"
+                    f"SQLite target forbidden in {key}='{val}' (this project uses BigQuery, not local file stores)"
                 )
 
+        # ------------------------------------------------------------------
+        # Kaggle
+        # ------------------------------------------------------------------
         kaggle_username = get_val("KAGGLE_USERNAME")
         kaggle_key = get_val("KAGGLE_KEY")
+
+        # ------------------------------------------------------------------
+        # BigQuery (required)
+        # ------------------------------------------------------------------
+        gcp_project = get_val("GCP_PROJECT")
+        bq_location = get_val("BQ_LOCATION", "EU")
+
+        bq_ds_raw_aw = get_val("BQ_DS_RAW_AW", "raw_adventureworks")
+        bq_ds_raw_olist = get_val("BQ_DS_RAW_OLIST", "raw_olist")
+        bq_ds_raw_marketing = get_val("BQ_DS_RAW_MARKETING", "raw_olist_marketing")
+        bq_ds_staging_ent = get_val("BQ_DS_STAGING_ENT", "staging_enterprise")
+        bq_ds_staging_mkt = get_val("BQ_DS_STAGING_MKT", "staging_marketplace")
+        bq_ds_curated_ent = get_val("BQ_DS_CURATED_ENT", "curated_enterprise")
+        bq_ds_curated_mkt = get_val("BQ_DS_CURATED_MKT", "curated_marketplace")
+        bq_ds_metadata = get_val("BQ_DS_METADATA", "pwa_metadata")
+        bq_ds_rollup = get_val("BQ_DS_ROLLUP", "rollup")
+        bq_ds_mart = get_val("BQ_DS_MART", "mart")
+
+        required_bq = {"GCP_PROJECT": gcp_project}
+        for k, v in required_bq.items():
+            if not v:
+                errors.append(f"Missing required environment variable: {k}")
+
+        # ------------------------------------------------------------------
+        # Optional: Aiven MySQL
+        # ------------------------------------------------------------------
         mysql_host = get_val("MYSQL_HOST")
-        mysql_port_str = get_val("MYSQL_PORT")
+        mysql_port_str = get_val("MYSQL_PORT", "0")
         mysql_user = get_val("MYSQL_USER", "avnadmin")
         mysql_password = get_val("MYSQL_PASSWORD")
-        mysql_db = get_val("MYSQL_DB", "movie_registry")
+        mysql_db = get_val("MYSQL_DB", "nexora_erp")
         mysql_ssl_ca_str = get_val("MYSQL_SSL_CA", "./certs/ca.pem")
+        mysql_ssl_ca = Path(mysql_ssl_ca_str).expanduser().resolve()
 
+        mysql_enabled = bool(mysql_host and mysql_password)
+        mysql_port = 0
+        if mysql_enabled:
+            try:
+                mysql_port = int(mysql_port_str)
+                if mysql_port == 3306:
+                    errors.append("MYSQL_PORT cannot be 3306 when using Aiven MySQL (requires a 5-digit port).")
+            except ValueError:
+                errors.append(f"MYSQL_PORT must be an integer, got '{mysql_port_str}'.")
+
+            if not mysql_ssl_ca.is_file():
+                errors.append(
+                    f"MYSQL_SSL_CA does not exist on disk: '{mysql_ssl_ca}'. "
+                    "Download the Aiven service CA certificate and save it there."
+                )
+            elif mysql_ssl_ca.stat().st_size == 0:
+                errors.append(f"MYSQL_SSL_CA exists but is empty: '{mysql_ssl_ca}'.")
+
+        # ------------------------------------------------------------------
+        # Optional: Cloud SQL PostgreSQL
+        # ------------------------------------------------------------------
         pg_connect_mode = get_val("PG_CONNECT_MODE", "connector").lower()
         pg_host = get_val("PG_HOST")
         pg_port_str = get_val("PG_PORT", "5432")
         pg_user = get_val("PG_USER", "loader")
         pg_password = get_val("PG_PASSWORD")
-        pg_db = get_val("PG_DB", "movie_credits")
+        pg_db = get_val("PG_DB", "nexora_marketplace")
         pg_instance_connection_name = get_val("PG_INSTANCE_CONNECTION_NAME")
         pg_bq_reader_user = get_val("PG_BQ_READER_USER", "bqreader")
         pg_bq_reader_password = get_val("PG_BQ_READER_PASSWORD")
+        bq_connection_id = get_val("BQ_CONNECTION_ID", "nexora-source-conn")
 
-        gcp_project = get_val("GCP_PROJECT")
-        bq_location = get_val("BQ_LOCATION", "EU")
-        bq_connection_id = get_val("BQ_CONNECTION_ID", "movie-credits-conn")
-        bq_ds_registry = get_val("BQ_DS_REGISTRY", "raw_registry")
-        bq_ds_credits = get_val("BQ_DS_CREDITS", "raw_credits")
-        bq_ds_files = get_val("BQ_DS_FILES", "raw_files")
-        bq_ds_mart = get_val("BQ_DS_MART", "mart")
-
-        # Rule 1: every required variable present and non-empty.
-        required = {
-            "MYSQL_HOST": mysql_host,
-            "MYSQL_PASSWORD": mysql_password,
-            "PG_PASSWORD": pg_password,
-            "PG_INSTANCE_CONNECTION_NAME": pg_instance_connection_name,
-            "PG_BQ_READER_PASSWORD": pg_bq_reader_password,
-            "GCP_PROJECT": gcp_project,
-        }
-        missing_required = [k for k, v in required.items() if not v]
-        if missing_required:
-            errors.append(f"Missing required environment variables: {', '.join(missing_required)}")
-
-        # Rule 2: MYSQL_PORT is an integer and is not 3306 (Aiven ports are five digits).
-        mysql_port = 0
-        if not mysql_port_str:
-            errors.append("MYSQL_PORT is required.")
-        else:
-            try:
-                mysql_port = int(mysql_port_str)
-                if mysql_port == 3306:
-                    errors.append("MYSQL_PORT cannot be 3306. Aiven MySQL requires a 5-digit port.")
-            except ValueError:
-                errors.append(f"MYSQL_PORT must be an integer, got '{mysql_port_str}'.")
-
-        # Rule 3: MYSQL_SSL_CA must exist on disk and be non-empty.
-        mysql_ssl_ca = Path(mysql_ssl_ca_str).expanduser().resolve()
-        if not mysql_ssl_ca.is_file():
-            errors.append(
-                f"MYSQL_SSL_CA does not exist on disk: '{mysql_ssl_ca}'. "
-                "Download the Aiven service CA certificate for this MySQL service "
-                "(Aiven console -> service -> Overview -> CA certificate) and save it there. "
-                "Without it the MySQL connection cannot verify the server's identity."
-            )
-        elif mysql_ssl_ca.stat().st_size == 0:
-            errors.append(f"MYSQL_SSL_CA exists but is empty: '{mysql_ssl_ca}'.")
-
-        # Rule 4: PG_INSTANCE_CONNECTION_NAME must be PROJECT:REGION:INSTANCE.
-        cloud_sql_region = ""
-        if pg_instance_connection_name:
-            if re.match(r"^[^:]+:[^:]+:[^:]+$", pg_instance_connection_name):
-                cloud_sql_region = pg_instance_connection_name.split(":")[1]
-            else:
-                errors.append(
-                    "PG_INSTANCE_CONNECTION_NAME must match 'PROJECT:REGION:INSTANCE', "
-                    f"got '{pg_instance_connection_name}'"
-                )
-
-        # Rule 5: BQ_LOCATION must be compatible with the Cloud SQL region.
-        if cloud_sql_region:
-            expected_bq_location = _normalize_region(cloud_sql_region)
-            normalized_bq_location = bq_location.upper()
-            if normalized_bq_location not in (expected_bq_location, cloud_sql_region.upper()):
-                errors.append(
-                    f"BQ_LOCATION '{bq_location}' is incompatible with Cloud SQL region "
-                    f"'{cloud_sql_region}' (expected '{expected_bq_location}' or '{cloud_sql_region}'). "
-                    "A mismatch surfaces later as a 'not found' error that never mentions location."
-                )
-
-        if pg_connect_mode not in ("direct", "connector"):
-            errors.append(f"PG_CONNECT_MODE must be 'direct' or 'connector', got '{pg_connect_mode}'")
+        pg_enabled = bool(pg_instance_connection_name and pg_password)
 
         pg_port = 5432
         if pg_port_str:
@@ -181,21 +216,55 @@ class Settings:
             except ValueError:
                 errors.append(f"PG_PORT must be an integer, got '{pg_port_str}'.")
 
-        if pg_connect_mode == "direct" and not pg_host:
+        if pg_connect_mode not in ("direct", "connector"):
+            errors.append(f"PG_CONNECT_MODE must be 'direct' or 'connector', got '{pg_connect_mode}'")
+
+        if pg_enabled and pg_connect_mode == "direct" and not pg_host:
             errors.append("PG_CONNECT_MODE is 'direct' but PG_HOST is empty.")
+
+        if pg_enabled and pg_instance_connection_name:
+            if not re.match(r"^[^:]+:[^:]+:[^:]+$", pg_instance_connection_name):
+                errors.append(
+                    "PG_INSTANCE_CONNECTION_NAME must match 'PROJECT:REGION:INSTANCE', "
+                    f"got '{pg_instance_connection_name}'"
+                )
+
+        # ------------------------------------------------------------------
+        # Local paths
+        # ------------------------------------------------------------------
+        source_base_str = get_val("PWA_SOURCE_BASE_DIR", str(REPO_ROOT / "data" / "source"))
+        manifest_dir_str = get_val("PWA_MANIFEST_DIR", str(REPO_ROOT / "data" / "manifests"))
+        source_base_dir = Path(source_base_str).expanduser().resolve()
+        manifest_dir = Path(manifest_dir_str).expanduser().resolve()
 
         if errors:
             raise ValueError("Configuration validation failed:\n  - " + "\n  - ".join(errors))
 
+        pwa_env = get_val("PWA_ENV", "development").lower()
+
         return cls(
+            pwa_env=pwa_env,
             kaggle_username=kaggle_username,
             kaggle_key=kaggle_key,
+            gcp_project=gcp_project,
+            bq_location=bq_location,
+            bq_ds_raw_aw=bq_ds_raw_aw,
+            bq_ds_raw_olist=bq_ds_raw_olist,
+            bq_ds_raw_marketing=bq_ds_raw_marketing,
+            bq_ds_staging_ent=bq_ds_staging_ent,
+            bq_ds_staging_mkt=bq_ds_staging_mkt,
+            bq_ds_curated_ent=bq_ds_curated_ent,
+            bq_ds_curated_mkt=bq_ds_curated_mkt,
+            bq_ds_metadata=bq_ds_metadata,
+            bq_ds_rollup=bq_ds_rollup,
+            bq_ds_mart=bq_ds_mart,
             mysql_host=mysql_host,
             mysql_port=mysql_port,
             mysql_user=mysql_user,
             mysql_password=mysql_password,
             mysql_db=mysql_db,
             mysql_ssl_ca=mysql_ssl_ca,
+            mysql_enabled=mysql_enabled,
             pg_connect_mode=pg_connect_mode,  # type: ignore[arg-type]
             pg_host=pg_host,
             pg_port=pg_port,
@@ -205,13 +274,10 @@ class Settings:
             pg_instance_connection_name=pg_instance_connection_name,
             pg_bq_reader_user=pg_bq_reader_user,
             pg_bq_reader_password=pg_bq_reader_password,
-            gcp_project=gcp_project,
-            bq_location=bq_location,
+            pg_enabled=pg_enabled,
             bq_connection_id=bq_connection_id,
-            bq_ds_registry=bq_ds_registry,
-            bq_ds_credits=bq_ds_credits,
-            bq_ds_files=bq_ds_files,
-            bq_ds_mart=bq_ds_mart,
+            source_base_dir=source_base_dir,
+            manifest_dir=manifest_dir,
         )
 
     def redacted_rows(self) -> list[tuple[str, str]]:
@@ -224,6 +290,29 @@ class Settings:
             else:
                 rows.append((f.name, str(value) if str(value) else "(empty)"))
         return rows
+
+    def all_bq_datasets(self) -> list[str]:
+        """Return all BigQuery dataset IDs used by the platform."""
+        return [
+            self.bq_ds_raw_aw,
+            self.bq_ds_raw_olist,
+            self.bq_ds_raw_marketing,
+            self.bq_ds_staging_ent,
+            self.bq_ds_staging_mkt,
+            self.bq_ds_curated_ent,
+            self.bq_ds_curated_mkt,
+            self.bq_ds_metadata,
+            self.bq_ds_rollup,
+            self.bq_ds_mart,
+        ]
+
+    def raw_datasets(self) -> list[str]:
+        """Return raw-layer BigQuery dataset IDs."""
+        return [self.bq_ds_raw_aw, self.bq_ds_raw_olist, self.bq_ds_raw_marketing]
+
+    def curated_datasets(self) -> list[str]:
+        """Return curated-layer BigQuery dataset IDs."""
+        return [self.bq_ds_curated_ent, self.bq_ds_curated_mkt]
 
 
 def get_settings() -> Settings:

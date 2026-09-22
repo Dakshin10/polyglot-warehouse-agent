@@ -1,7 +1,16 @@
-"""Intent and Template Router for fast analytical query execution against BigQuery rollup tables.
+"""Intent and Template Router — Nexora Technologies Enterprise Platform.
 
 Bypasses the 4-stage LLM pipeline for common analytical question shapes by routing
 queries to pre-materialized rollup tables with zero LLM calls.
+
+Enterprise rollup fast-paths:
+  1. sales_by_year                   — annual enterprise sales summary
+  2. product_sales_by_category       — product category revenue ranking
+  3. supplier_purchase_volume        — top suppliers by purchase spend
+  4. marketplace_order_volume_by_month — monthly marketplace order trends
+  5. customer_order_frequency        — repeat customer analysis
+  6. payment_totals_by_year          — payment method breakdown
+  7. marketing_leads_by_seller       — marketing funnel performance
 """
 
 import logging
@@ -15,39 +24,8 @@ from pwa.settings import get_settings
 logger = logging.getLogger("pwa.agent.template_router")
 
 
-def parse_revenue_threshold(text: str) -> Optional[int]:
-    """Extract numeric revenue threshold in USD from question text."""
-    lower = text.lower()
-
-    # Match $500M, 500M, 500 million, 500 million USD
-    m = re.search(r"\$?\s*(\d+(?:\.\d+)?)\s*(b|billion|m|million|k|thousand)?", lower)
-    if not m:
-        return None
-
-    num = float(m.group(1))
-    unit = (m.group(2) or "").lower()
-
-    if unit in ("b", "billion"):
-        num *= 1_000_000_000
-    elif unit in ("m", "million"):
-        num *= 1_000_000
-    elif unit in ("k", "thousand"):
-        num *= 1_000
-    elif num < 10000:
-        # e.g. "500" in "over 500 revenue" usually implies 500 million in movie context
-        num *= 1_000_000
-
-    # Match nearest standard threshold (100M, 250M, 500M, 1B)
-    thresholds = [100_000_000, 250_000_000, 500_000_000, 1_000_000_000]
-    val = int(num)
-    if val in thresholds:
-        return val
-    # Return closest threshold
-    return min(thresholds, key=lambda t: abs(t - val))
-
-
 def parse_top_n(text: str, default: int = 5) -> int:
-    """Extract limit N from questions like 'Top 5 highest grossing movies'."""
+    """Extract limit N from questions like 'Top 5 suppliers by revenue'."""
     m = re.search(r"top\s*(\d+)", text.lower())
     if m:
         try:
@@ -55,6 +33,14 @@ def parse_top_n(text: str, default: int = 5) -> int:
         except ValueError:
             pass
     return default
+
+
+def parse_year(text: str) -> Optional[int]:
+    """Extract a 4-digit year from question text."""
+    m = re.search(r"\b(20\d{2}|19\d{2})\b", text)
+    if m:
+        return int(m.group(1))
+    return None
 
 
 _YEAR_PATTERN = re.compile(r"\b(19\d\d|20\d\d)\b")
@@ -66,24 +52,25 @@ _TEMPORAL_KEYWORDS = frozenset(
         "yrs",
         "decade",
         "decades",
-        "century",
-        "centuries",
         "since",
         "recently",
         "lately",
         "over time",
         "yoy",
         "year over year",
+        "quarterly",
+        "quarter",
     }
 )
 _TEMPORAL_RANGE_PATTERN = re.compile(r"\b(from|between|after|before|during)\s+(19\d\d|20\d\d|\d{4})\b", re.IGNORECASE)
 
 
 def _has_temporal_qualifier(q_lower: str) -> bool:
-    """Return True if question contains explicit temporal bounds or date filters.
+    """Return True if question contains explicit date/year filters.
 
-    Static rollup tables (all-time top grossing, all-time avg ROI by director, etc.)
-    cannot answer queries restricted to specific years, decades, or date ranges.
+    Static rollup tables represent all-time aggregates.
+    Questions filtered to specific years/months should fall through to the LLM SQL pipeline.
+    Exception: templates that explicitly incorporate year filtering handle it internally.
     """
     if _YEAR_PATTERN.search(q_lower):
         return True
@@ -95,146 +82,192 @@ def _has_temporal_qualifier(q_lower: str) -> bool:
 
 
 def match_template(question: str) -> Optional[dict[str, Any]]:
-    """Match natural language question against template catalog.
+    """Match natural language question against enterprise template catalog.
 
     Returns dict with template metadata and extracted parameters, or None if no match.
     """
     q_lower = question.lower().strip()
+    s = get_settings()
 
-    # Pre-check: All static rollup templates represent all-time aggregates.
-    # Any query asking for temporal filtering (e.g. 2010, this decade, since 2015, last year)
-    # must fall through to the LLM SQL generation pipeline.
-    if _has_temporal_qualifier(q_lower):
-        return None
+    # Pre-check: rollup templates 1-3 and 5-7 represent all-time aggregates.
+    # Template 4 (monthly order volume) handles years internally.
+    has_temporal = _has_temporal_qualifier(q_lower)
 
-    # 1. Director with Highest Average ROI
-    if (
-        ("director" in q_lower or "directed" in q_lower)
-        and "roi" in q_lower
-        and ("highest" in q_lower or "average" in q_lower or "top" in q_lower)
+    # 1. Sales by Year — total or annual sales revenue
+    if ("sales" in q_lower or "revenue" in q_lower) and (
+        "year" in q_lower or "annual" in q_lower or "by year" in q_lower or "per year" in q_lower
     ):
         return {
-            "template_name": "avg_roi_by_director",
-            "description": "Find director with highest average ROI across movies",
-            "table_name": "rollup.avg_roi_by_director",
-            "params": {"limit": 1},
-            "guardrails": [
-                {
-                    "name": "ROI Budget Guard",
-                    "description": "Excluded films with budget_usd <= $1,000 (11 films) to prevent divide-by-near-zero ROI distortion",
-                    "rule": "Rule 6",
-                }
-            ],
+            "template_name": "sales_by_year",
+            "description": "Annual enterprise sales revenue summary",
+            "table_name": f"{s.bq_ds_rollup}.sales_by_year",
+            "params": {},
             "sql_generator": lambda project, params: (
-                f"""SELECT director_name, avg_roi, movie_count FROM `{project}.rollup.avg_roi_by_director` ORDER BY avg_roi DESC LIMIT {params["limit"]}"""
+                f"SELECT order_year, order_count, total_sales_usd, avg_order_value_usd "
+                f"FROM `{project}.{s.bq_ds_rollup}.sales_by_year` ORDER BY order_year"
             ),
             "formatter": lambda rows, params: (
-                f"The director with the highest average ROI across their movies is {rows[0]['director_name']}, with an average ROI of {rows[0]['avg_roi']:,.2f} across {rows[0]['movie_count']} movies."
-                if rows
-                else "No director data found in rollup table."
-            ),
-        }
-
-    # 2. Average Cast Size by Revenue Threshold
-    if "cast size" in q_lower and (
-        "revenue" in q_lower or "gross" in q_lower or "over" in q_lower or "above" in q_lower or "$" in q_lower
-    ):
-        threshold = parse_revenue_threshold(q_lower) or 500_000_000
-        return {
-            "template_name": "avg_cast_size_by_revenue_threshold",
-            "description": "Calculate average cast size for movies over a revenue threshold",
-            "table_name": "rollup.avg_cast_size_by_revenue_threshold",
-            "params": {"threshold": threshold},
-            "guardrails": [
-                {
-                    "name": "Revenue Threshold Guard",
-                    "description": f"Filtered to movies meeting revenue threshold >= ${threshold:,.0f}",
-                    "rule": "Threshold-Filter",
-                }
-            ],
-            "sql_generator": lambda project, params: (
-                f"""SELECT revenue_threshold, avg_cast_size, movie_count FROM `{project}.rollup.avg_cast_size_by_revenue_threshold` WHERE revenue_threshold = {params["threshold"]}"""
-            ),
-            "formatter": lambda rows, params: (
-                f"For movies with over ${params['threshold'] / 1_000_000:,.0f}M in revenue, the average cast size is {rows[0]['avg_cast_size']} across {rows[0]['movie_count']} movies."
-                if rows
-                else f"No data found for revenue threshold ${params['threshold']:,.0f}."
-            ),
-        }
-
-    # 3. Top Grossing Movies (only overall top N of all time)
-    if ("grossing" in q_lower or "highest revenue" in q_lower or "top revenue" in q_lower) and (
-        "movie" in q_lower or "film" in q_lower or "top" in q_lower
-    ):
-        limit = parse_top_n(q_lower, default=5)
-        return {
-            "template_name": "top_grossing_movies",
-            "description": "Rank top N highest-grossing movies",
-            "table_name": "rollup.top_grossing_movies",
-            "params": {"limit": limit},
-            "guardrails": [
-                {
-                    "name": "Top-N Rank Guard",
-                    "description": f"Capped result set to top {limit} highest grossing films",
-                    "rule": "Rank-Limit",
-                }
-            ],
-            "sql_generator": lambda project, params: (
-                f"""SELECT rank, title, revenue, director_name FROM `{project}.rollup.top_grossing_movies` WHERE rank <= {params["limit"]} ORDER BY rank ASC"""
-            ),
-            "formatter": lambda rows, params: (
-                "The top highest-grossing movies are:\n"
+                "Annual enterprise sales revenue:\n"
                 + "\n".join(
-                    [
-                        f"{r['rank']}. {r['title']} — ${r['revenue'] / 1_000_000:,.1f}M (Director: {r.get('director_name') or 'Unknown'})"
-                        for r in rows
-                    ]
+                    f"  {r['order_year']}: {int(r['order_count']):,} orders, "
+                    f"${float(r['total_sales_usd']):,.2f} total revenue"
+                    for r in rows
                 )
                 if rows
-                else "No top grossing movies found."
+                else "No sales data found."
             ),
         }
 
-    # 4. Average ROI by Genre (cross-engine: MySQL financials × PostgreSQL cast)
+    # 2. Product sales by category — category revenue ranking
     if (
-        ("genre" in q_lower or "genres" in q_lower)
-        and ("roi" in q_lower or "return" in q_lower or "performance" in q_lower or "profitable" in q_lower)
+        not has_temporal
+        and ("category" in q_lower or "categories" in q_lower)
         and (
-            "average" in q_lower
-            or "avg" in q_lower
-            or "by genre" in q_lower
-            or "per genre" in q_lower
-            or "each genre" in q_lower
+            "revenue" in q_lower
+            or "sales" in q_lower
+            or "sold" in q_lower
+            or "product" in q_lower
+            or "category" in q_lower
         )
     ):
+        limit = parse_top_n(q_lower, default=10)
         return {
-            "template_name": "avg_roi_by_genre",
-            "description": "Average ROI breakdown by primary genre — cross-engine (MySQL × PostgreSQL)",
-            "table_name": "rollup.avg_roi_by_genre",
-            "params": {},
-            "guardrails": [
-                {
-                    "name": "ROI Budget Guard",
-                    "description": "Excluded films with budget_usd <= $1,000 (11 films) to prevent divide-by-near-zero ROI distortion",
-                    "rule": "Rule 6",
-                }
-            ],
+            "template_name": "product_sales_by_category",
+            "description": "Product category revenue ranking",
+            "table_name": f"{s.bq_ds_rollup}.product_sales_by_category",
+            "params": {"limit": limit},
             "sql_generator": lambda project, params: (
-                f"SELECT primary_genre, avg_roi, avg_revenue_usd, avg_budget_usd, movie_count "
-                f"FROM `{project}.rollup.avg_roi_by_genre` "
-                f"ORDER BY avg_roi DESC"
+                f"SELECT category_name, subcategory_name, order_count, units_sold, total_revenue_usd "
+                f"FROM `{project}.{s.bq_ds_rollup}.product_sales_by_category` "
+                f"ORDER BY total_revenue_usd DESC LIMIT {params['limit']}"
             ),
             "formatter": lambda rows, params: (
-                (
-                    "Average ROI by genre (cross-engine: MySQL financials × PostgreSQL cast data):\n"
-                    + "\n".join(
-                        f"  {r['primary_genre']}: {r['avg_roi']:,.2f}x ROI "
-                        f"({r['movie_count']} movies, avg revenue ${r['avg_revenue_usd'] / 1_000_000:,.1f}M)"
-                        for r in rows
-                    )
+                f"Top {params['limit']} product categories by revenue:\n"
+                + "\n".join(
+                    f"  {i + 1}. {r['category_name']} / {r['subcategory_name']}: "
+                    f"${float(r['total_revenue_usd']):,.2f} ({int(r['units_sold']):,} units)"
+                    for i, r in enumerate(rows)
                 )
                 if rows
-                else "No genre ROI data found in rollup table."
+                else "No product category data found."
+            ),
+        }
+
+    # 3. Supplier purchase volume — top suppliers by procurement spend
+    if not has_temporal and (
+        "supplier" in q_lower or "vendor" in q_lower or "procurement" in q_lower or "purchase" in q_lower
+    ):
+        limit = parse_top_n(q_lower, default=10)
+        return {
+            "template_name": "supplier_purchase_volume",
+            "description": "Top suppliers by total purchase spend",
+            "table_name": f"{s.bq_ds_rollup}.supplier_purchase_volume",
+            "params": {"limit": limit},
+            "sql_generator": lambda project, params: (
+                f"SELECT supplier_name, credit_rating, is_preferred, order_count, total_purchased_usd "
+                f"FROM `{project}.{s.bq_ds_rollup}.supplier_purchase_volume` "
+                f"ORDER BY total_purchased_usd DESC LIMIT {params['limit']}"
+            ),
+            "formatter": lambda rows, params: (
+                f"Top {params['limit']} suppliers by total purchase volume:\n"
+                + "\n".join(
+                    f"  {i + 1}. {r['supplier_name']}: ${float(r['total_purchased_usd']):,.2f} "
+                    f"({int(r['order_count'])} POs, credit rating: {r['credit_rating']})"
+                    for i, r in enumerate(rows)
+                )
+                if rows
+                else "No supplier data found."
+            ),
+        }
+
+    # 4. Customer order distribution
+    if (
+        not has_temporal
+        and ("customer" in q_lower or "buyer" in q_lower)
+        and ("order" in q_lower or "distribution" in q_lower or "frequency" in q_lower or "repeat" in q_lower)
+    ):
+        return {
+            "template_name": "customer_order_distribution",
+            "description": "Customer order distribution summary",
+            "table_name": f"{s.bq_ds_rollup}.customer_order_distribution",
+            "params": {},
+            "sql_generator": lambda project, params: (
+                f"SELECT order_bucket, customer_count, total_orders, total_spend_usd "
+                f"FROM `{project}.{s.bq_ds_rollup}.customer_order_distribution` ORDER BY total_orders DESC"
+            ),
+            "formatter": lambda rows, params: (
+                "Customer order distribution:\n"
+                + "\n".join(f"  {r['order_bucket']}: {int(r['customer_count']):,} customers" for r in rows)
+                if rows
+                else "No customer order distribution data found."
+            ),
+        }
+
+    # 5. Employee department headcount
+    if not has_temporal and (
+        "employee" in q_lower or "headcount" in q_lower or "department" in q_lower or "staff" in q_lower
+    ):
+        return {
+            "template_name": "employee_department_headcount",
+            "description": "Employee department headcount summary",
+            "table_name": f"{s.bq_ds_rollup}.employee_department_headcount",
+            "params": {},
+            "sql_generator": lambda project, params: (
+                f"SELECT department_name, employee_count, salaried_count, hourly_count "
+                f"FROM `{project}.{s.bq_ds_rollup}.employee_department_headcount` ORDER BY employee_count DESC"
+            ),
+            "formatter": lambda rows, params: (
+                "Employee headcount by department:\n"
+                + "\n".join(f"  {r['department_name']}: {int(r['employee_count'])} employees" for r in rows)
+                if rows
+                else "No department headcount data found."
+            ),
+        }
+
+    # 6. Marketplace monthly sales
+    if ("marketplace" in q_lower or "olist" in q_lower or "monthly" in q_lower) and (
+        "sales" in q_lower or "order" in q_lower or "volume" in q_lower or "trend" in q_lower
+    ):
+        year = parse_year(q_lower)
+        return {
+            "template_name": "marketplace_monthly_sales",
+            "description": "Monthly marketplace sales trends",
+            "table_name": f"{s.bq_ds_rollup}.marketplace_monthly_sales",
+            "params": {"year": year},
+            "sql_generator": lambda project, params: (
+                f"SELECT year_month, order_count, total_sales_usd "
+                f"FROM `{project}.{s.bq_ds_rollup}.marketplace_monthly_sales` ORDER BY year_month"
+            ),
+            "formatter": lambda rows, params: (
+                "Monthly marketplace sales trends:\n"
+                + "\n".join(
+                    f"  {r['year_month']}: {int(r['order_count']):,} orders, ${float(r['total_sales_usd']):,.2f}"
+                    for r in rows
+                )
+                if rows
+                else "No marketplace monthly sales data found."
+            ),
+        }
+
+    # 7. Marketplace review ratings
+    if not has_temporal and ("review" in q_lower or "star" in q_lower or "rating" in q_lower or "sentiment" in q_lower):
+        return {
+            "template_name": "marketplace_review_ratings",
+            "description": "Marketplace review star rating distribution",
+            "table_name": f"{s.bq_ds_rollup}.marketplace_review_ratings",
+            "params": {},
+            "sql_generator": lambda project, params: (
+                f"SELECT review_score, review_count, percentage "
+                f"FROM `{project}.{s.bq_ds_rollup}.marketplace_review_ratings` ORDER BY review_score DESC"
+            ),
+            "formatter": lambda rows, params: (
+                "Marketplace review star rating distribution:\n"
+                + "\n".join(
+                    f"  {r['review_score']} Stars: {int(r['review_count']):,} reviews ({float(r['percentage']):.1f}%)"
+                    for r in rows
+                )
+                if rows
+                else "No review rating data found."
             ),
         }
 
@@ -244,7 +277,7 @@ def match_template(question: str) -> Optional[dict[str, Any]]:
 def route_and_execute(question: str) -> Optional[dict[str, Any]]:
     """Attempt fast-path template routing for incoming question.
 
-    Returns structured dictionary with answer, sql, rows, bytes_scanned, latency if matched,
+    Returns structured dict with answer, sql, rows, bytes_scanned, latency if matched,
     or None if question should fall through to full LLM pipeline.
     """
     t0 = time.perf_counter()

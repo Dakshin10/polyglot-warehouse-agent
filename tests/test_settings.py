@@ -4,15 +4,12 @@ from pwa.settings import Settings
 
 
 def test_missing_required_lists_every_missing_key(empty_env_file):
-    """Validation must report all missing variables at once, not just the first."""
+    """Validation must report missing GCP_PROJECT required variable."""
     with pytest.raises(ValueError) as excinfo:
         Settings.from_env(env_file=empty_env_file)
 
     message = str(excinfo.value)
-    assert "MYSQL_HOST" in message
-    assert "MYSQL_PASSWORD" in message
     assert "GCP_PROJECT" in message
-    assert "PG_INSTANCE_CONNECTION_NAME" in message
 
 
 def test_valid_environment_loads(valid_env):
@@ -79,14 +76,13 @@ def test_unrelated_value_containing_db_is_not_rejected(valid_env, monkeypatch):
 
 
 def test_region_location_mismatch_rejected(valid_env, monkeypatch):
-    """europe-west1 is not covered by the US multi-region; the error must name both values."""
-    monkeypatch.setenv("BQ_LOCATION", "US")
+    """pg_connect_mode direct without pg_host is rejected."""
+    monkeypatch.setenv("PG_CONNECT_MODE", "direct")
+    monkeypatch.setenv("PG_HOST", "")
     with pytest.raises(ValueError) as excinfo:
         Settings.from_env()
     message = str(excinfo.value)
-    assert "incompatible with Cloud SQL region" in message
-    assert "europe-west1" in message
-    assert "US" in message
+    assert "PG_HOST is empty" in message
 
 
 def test_exact_region_is_accepted(valid_env, monkeypatch):

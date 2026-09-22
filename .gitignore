@@ -3,9 +3,16 @@
 .env.local
 certs/
 
-# Data Directories
-data/
+# Data Directories — source data files are NEVER committed (only manifests)
+data/source/
+data/staging/
 *.csv
+*.xlsx
+*.xls
+
+# Manifests ARE committed (checksums/metadata only, no raw data)
+!data/manifests/
+!data/manifests/*.yaml
 
 # Python Virtual Environments & Packages
 venv/
@@ -21,7 +28,7 @@ __pycache__/
 *.pyo
 *.pyd
 
-# SQLite Databases (Forbidden)
+# SQLite Databases (Forbidden — cloud-native platform)
 *.db
 *.sqlite
 *.sqlite3
@@ -38,3 +45,6 @@ src/pwa/agent/.schema_cache/
 .agents/
 .claude/
 .streamlit/
+.coverage
+*.sync_state.json
+.sync_state.json

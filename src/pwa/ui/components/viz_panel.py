@@ -132,8 +132,12 @@ def render_viz_panel(
             from pwa.ui.viz_recommendation import build_from_shape
 
             recommendation_dict = build_from_shape(df, question).to_dict()
-        except Exception:
-            return  # silently skip if everything fails
+        except Exception as exc:
+            import logging
+
+            logging.getLogger("pwa.ui.viz_panel").error(f"Viz recommendation shape build error: {exc}", exc_info=True)
+            st.caption(f"⚠️ Could not compute visual recommendation: {exc}")
+            return
 
     primary_d = recommendation_dict.get("primary", {})
     alternatives_d = recommendation_dict.get("alternatives", [])

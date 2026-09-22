@@ -19,23 +19,28 @@ from pwa.settings import get_settings
 
 logger = logging.getLogger("pwa.agent.root_agent")
 
-SYSTEM_INSTRUCTION_TEMPLATE = """You are a specialized Data Analytics Assistant for the Polyglot Warehouse Agent (PWA).
-Your sole purpose is to answer natural-language questions about movies, credits, keywords, and data integrity by querying Google BigQuery views.
+SYSTEM_INSTRUCTION_TEMPLATE = """You are a specialized Data Analytics Assistant for the Nexora Enterprise Platform (Polyglot Warehouse Agent).
+Your sole purpose is to answer natural-language questions about enterprise operations, sales, products, customers, orders, logistics, marketing leads, employees, suppliers, and data integrity by querying Google BigQuery views.
 
 === MART SCHEMA SURFACE ===
 {schema_summary}
 
 === STRICT OPERATIONAL RULES ===
 1. READ-ONLY SQL ONLY: You must ONLY generate and execute SELECT queries. You are STRICTLY FORBIDDEN from performing any DDL or DML operations (e.g. CREATE, DROP, ALTER, INSERT, UPDATE, DELETE).
-2. USE MART VIEWS ONLY: You must ONLY query the 5 allowed views in the `mart` dataset:
-   - `mart.v_movie`: Core movie metadata (title, budget, revenue, ROI, genre, release date, TMDB rating).
-   - `mart.v_movie_credits`: Cast & crew data (director, lead actor, second actor, cast size, crew size).
-   - `mart.v_movie_keywords`: Normalized keywords (movie_id, keyword_id, keyword).
-   - `mart.v_movie_full`: Combined master view joining movie, credits, keywords, and MovieLens rating aggregates.
-   - `mart.v_integrity_exceptions`: Data quality exceptions table.
-   DO NOT query staging tables or raw source tables (`raw_registry`, `raw_credits`, `raw_files`).
+2. USE MART VIEWS ONLY: You must ONLY query the allowed enterprise views in the `mart` dataset:
+   - `mart.v_sales_order_line`: Sales orders with line item amounts, product and customer details.
+   - `mart.v_product_catalog`: Product catalog with pricing, category, and vendor details.
+   - `mart.v_customer_360`: Unified customer 360 overview across B2B enterprise and marketplace channels.
+   - `mart.v_employee_directory`: Enterprise employee directory with organizational hierarchy and demographics.
+   - `mart.v_supplier_performance`: Supplier purchasing volume, vendor evaluation, and lead times.
+   - `mart.v_marketplace_order_summary`: Olist marketplace orders with payment totals and customer geography.
+   - `mart.v_marketplace_delivery_performance`: Olist order delivery metrics and logistics SLA fulfillment.
+   - `mart.v_marketplace_review_sentiment`: Olist product review feedback and star rating scores.
+   - `mart.v_marketplace_marketing_funnel`: Olist seller qualified leads, origin channels, and conversion rates.
+   - `mart.v_integrity_exceptions`: Warehouse cross-domain data quality exceptions table.
+   DO NOT query staging tables or raw source tables (`raw_adventureworks`, `raw_olist`, `raw_olist_marketing`).
 3. NATURAL LANGUAGE SYNTHESIS: Always synthesize query results into clear, concise, and professional natural language answers. Do NOT just output raw JSON or unformatted tabular data.
-4. OUT-OF-SCOPE QUESTIONS: If a user asks a question that CANNOT be answered from the available mart views (e.g. personal addresses, external news, non-movie topics), clearly state that the question cannot be answered from the available warehouse mart views rather than guessing or hallucinating facts.
+4. OUT-OF-SCOPE QUESTIONS: If a user asks a question that CANNOT be answered from the available mart views (e.g. movie box office, external news, personal addresses), clearly state that the question cannot be answered from the available enterprise warehouse mart views rather than guessing or hallucinating facts.
 """
 
 
@@ -52,7 +57,9 @@ def _init_env() -> None:
         settings = get_settings()
         os.environ.setdefault("GOOGLE_CLOUD_PROJECT", settings.gcp_project)
     except Exception:
-        os.environ.setdefault("GOOGLE_CLOUD_PROJECT", "salitsteel-502008")
+        # No hardcoded real-project fallback: fail visibly downstream rather
+        # than silently pointing Vertex AI at a specific project nobody chose.
+        os.environ.setdefault("GOOGLE_CLOUD_PROJECT", "GCP_PROJECT_NOT_CONFIGURED")
 
     # Always default to us-central1 for Vertex AI — override with
     # GOOGLE_CLOUD_LOCATION env var if you need a different AI Platform region.
@@ -71,25 +78,40 @@ def build_system_instruction() -> str:
     except Exception as e:
         logger.warning(f"Could not fetch schema snapshot for prompt injection: {e}")
         schema_summary = (
-            "Allowed views: mart.v_movie, mart.v_movie_credits, "
-            "mart.v_movie_keywords, mart.v_movie_full, mart.v_integrity_exceptions."
+            "Allowed views: mart.v_sales_order_line, mart.v_product_catalog, "
+            "mart.v_customer_360, mart.v_employee_directory, mart.v_supplier_performance, "
+            "mart.v_marketplace_order_summary, mart.v_marketplace_delivery_performance, "
+            "mart.v_marketplace_review_sentiment, mart.v_marketplace_marketing_funnel, "
+            "mart.v_integrity_exceptions."
         )
 
     return SYSTEM_INSTRUCTION_TEMPLATE.format(schema_summary=schema_summary)
 
 
-_init_env()
-
 # Recommended latest stable Gemini model
 MODEL_NAME = "gemini-2.5-flash"
 
-# Instantiate ADK Agent
-agent = Agent(
-    name="polyglot_warehouse_agent",
-    model=MODEL_NAME,
-    instruction=build_system_instruction(),
-    tools=[get_mart_toolset()],
-)
+_agent: Agent | None = None
+
+
+def _get_agent() -> Agent:
+    """Lazily build the ADK Agent on first use.
+
+    Deliberately not built at import time: constructing it makes a live
+    BigQuery call (via `build_system_instruction`) and mutates process
+    environment variables, which a merely-deprecated module should not do
+    just by being imported.
+    """
+    global _agent
+    if _agent is None:
+        _init_env()
+        _agent = Agent(
+            name="polyglot_warehouse_agent",
+            model=MODEL_NAME,
+            instruction=build_system_instruction(),
+            tools=[get_mart_toolset()],
+        )
+    return _agent
 
 
 def run_query(question: str) -> str:
@@ -98,7 +120,7 @@ def run_query(question: str) -> str:
         raise ValueError("Question cannot be empty.")
 
     _init_env()
-    runner = InMemoryRunner(agent=agent, app_name="pwa_agent")
+    runner = InMemoryRunner(agent=_get_agent(), app_name="pwa_agent")
 
     async def _async_run() -> str:
         session = await runner.session_service.create_session(app_name="pwa_agent", user_id="pwa_user")

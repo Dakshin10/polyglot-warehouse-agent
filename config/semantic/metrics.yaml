@@ -1,0 +1,38 @@
+# Governed Derived Business Metrics Configuration for Nexora Technologies
+
+metrics:
+  average_order_value:
+    name: "average_order_value"
+    display_name: "Average Order Value (AOV)"
+    description: "Average financial value per completed sales order"
+    formula: "SUM(total_due) / NULLIF(COUNT(sales_order_id), 0)"
+    measures_used: ["revenue", "order_count"]
+    data_type: "NUMERIC"
+    format: "CURRENCY"
+
+  gross_margin_percentage:
+    name: "gross_margin_percentage"
+    display_name: "Gross Margin %"
+    description: "Gross margin percentage over total sales revenue"
+    formula: "(SUM(total_due) - SUM(subtotal)) / NULLIF(SUM(total_due), 0) * 100"
+    measures_used: ["revenue"]
+    data_type: "NUMERIC"
+    format: "PERCENTAGE"
+
+  average_purchase_order_value:
+    name: "average_purchase_order_value"
+    display_name: "Average Purchase Order Value"
+    description: "Average purchase order commitment amount to vendors"
+    formula: "SUM(total_due) / NULLIF(COUNT(purchase_order_id), 0)"
+    measures_used: ["purchase_amount", "purchase_order_count"]
+    data_type: "NUMERIC"
+    format: "CURRENCY"
+
+  units_per_order:
+    name: "units_per_order"
+    display_name: "Units Per Order"
+    description: "Average quantity of product items included per order"
+    formula: "SUM(order_qty) / NULLIF(COUNT(DISTINCT sales_order_id), 0)"
+    measures_used: ["quantity_sold", "order_count"]
+    data_type: "NUMERIC"
+    format: "DECIMAL"

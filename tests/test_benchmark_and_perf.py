@@ -12,18 +12,18 @@ def test_load_benchmark_queries():
     assert "top_n" in categories
     assert "filtering" in categories
     assert "group_by" in categories
-    assert "federated" in categories
+    assert "cross_source" in categories
     assert "date_time" in categories
     assert "ambiguous_edge" in categories
 
 
 def test_evaluate_query_conditions_pass():
     """Test 5 strict conditions pass on a valid PipelineResult."""
-    entry = {"id": "q01", "category": "top_n", "question": "which 3 movies had highest revenue?"}
+    entry = {"id": "q01", "category": "top_n", "question": "what is total sales by year?"}
     res = PipelineResult(
-        answer="Avatar is top.",
-        sql="SELECT title FROM mart.v_movie LIMIT 3",
-        rows=[{"title": "Avatar"}],
+        answer="Sales by year.",
+        sql="SELECT order_year FROM mart.v_sales_order_line LIMIT 3",
+        rows=[{"order_year": 2014}],
         bytes_scanned=100,
         exec_status="SUCCESS",
         row_count=1,
@@ -39,7 +39,7 @@ def test_evaluate_query_conditions_ast_fail():
     entry = {"id": "q02", "category": "top_n", "question": "test"}
     res = PipelineResult(
         answer="Done",
-        sql="DROP TABLE mart.v_movie",
+        sql="DROP TABLE mart.v_sales_order_line",
         rows=[],
         exec_status="SUCCESS",
     )

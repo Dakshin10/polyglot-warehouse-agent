@@ -1,0 +1,42 @@
+# Governed Time Dimensions Configuration for Nexora Technologies
+
+time_dimensions:
+  order_date:
+    name: "order_date"
+    display_name: "Order Date"
+    description: "Date and time when a sales or purchase order transaction was placed"
+    type: "TIMESTAMP"
+    default_granularity: "DAY"
+    supported_granularities: ["DAY", "WEEK", "MONTH", "QUARTER", "YEAR"]
+    entity: "fact_sales_order"
+    column: "order_date"
+
+  hire_date:
+    name: "hire_date"
+    display_name: "Hire Date"
+    description: "Date when an employee joined Nexora Technologies"
+    type: "DATE"
+    default_granularity: "YEAR"
+    supported_granularities: ["MONTH", "YEAR"]
+    entity: "dim_employee"
+    column: "hire_date"
+
+  first_contact_date:
+    name: "first_contact_date"
+    display_name: "First Contact Date"
+    description: "Date when a marketing lead first engaged with Nexora"
+    type: "DATE"
+    default_granularity: "MONTH"
+    supported_granularities: ["DAY", "MONTH", "YEAR"]
+    entity: "dim_lead"
+    column: "first_contact_date"
+
+  created_at:
+    name: "created_at"
+    display_name: "Created At"
+    description: "System timestamp when a record was initially created"
+    type: "TIMESTAMP"
+    default_granularity: "DAY"
+    supported_granularities: ["DAY", "MONTH", "YEAR"]
+    entity: "dim_customer"
+    column: "created_at"

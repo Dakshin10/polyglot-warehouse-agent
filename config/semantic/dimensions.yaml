@@ -1,0 +1,168 @@
+# Governed Analytical Dimensions Configuration for Nexora Technologies
+
+dimensions:
+  customer:
+    name: "customer"
+    display_name: "Customer"
+    description: "Customer account attributes"
+    entity: "dim_customer"
+    key_column: "enterprise_customer_id"
+    attributes:
+      - name: "customer_name"
+        type: "STRING"
+        column: "customer_name"
+      - name: "account_number"
+        type: "STRING"
+        column: "account_number"
+      - name: "source_system"
+        type: "STRING"
+        column: "source_system"
+
+  product:
+    name: "product"
+    display_name: "Product"
+    description: "Product catalog attributes and hierarchy"
+    entity: "dim_product"
+    key_column: "enterprise_product_id"
+    attributes:
+      - name: "product_name"
+        type: "STRING"
+        column: "product_name"
+      - name: "product_number"
+        type: "STRING"
+        column: "product_number"
+      - name: "category_name"
+        type: "STRING"
+        column: "category_name"
+      - name: "subcategory_name"
+        type: "STRING"
+        column: "subcategory_name"
+      - name: "color"
+        type: "STRING"
+        column: "color"
+
+  product_category:
+    name: "product_category"
+    display_name: "Product Category"
+    description: "Product top-level category hierarchy"
+    entity: "dim_product"
+    key_column: "category_name"
+    attributes:
+      - name: "category_name"
+        type: "STRING"
+        column: "category_name"
+
+  supplier:
+    name: "supplier"
+    display_name: "Supplier"
+    description: "Vendor and supplier master attributes"
+    entity: "dim_supplier"
+    key_column: "vendor_id"
+    attributes:
+      - name: "supplier_name"
+        type: "STRING"
+        column: "vendor_name"
+      - name: "credit_rating"
+        type: "INTEGER"
+        column: "credit_rating"
+
+  territory:
+    name: "territory"
+    display_name: "Sales Territory"
+    description: "Geographic sales region or territory"
+    entity: "fact_sales_order"
+    key_column: "territory_id"
+    attributes:
+      - name: "territory_id"
+        type: "STRING"
+        column: "territory_id"
+
+  employee:
+    name: "employee"
+    display_name: "Employee"
+    description: "Employee HR directory attributes"
+    entity: "dim_employee"
+    key_column: "employee_id"
+    attributes:
+      - name: "job_title"
+        type: "STRING"
+        column: "job_title"
+      - name: "department_id"
+        type: "STRING"
+        column: "department_id"
+
+  marketplace:
+    name: "marketplace"
+    display_name: "Channel"
+    description: "Operational sales channel (Enterprise vs Marketplace)"
+    entity: "fact_sales_order"
+    key_column: "channel"
+    attributes:
+      - name: "channel"
+        type: "STRING"
+        column: "channel"
+
+  marketplace_customer:
+    name: "marketplace_customer"
+    display_name: "Marketplace Customer"
+    description: "Marketplace customer location attributes"
+    entity: "dim_marketplace_customer"
+    key_column: "source_customer_id"
+    attributes:
+      - name: "state"
+        type: "STRING"
+        column: "state"
+      - name: "city"
+        type: "STRING"
+        column: "city"
+
+  marketplace_seller:
+    name: "marketplace_seller"
+    display_name: "Marketplace Seller"
+    description: "Marketplace seller location attributes"
+    entity: "dim_marketplace_seller"
+    key_column: "source_seller_id"
+    attributes:
+      - name: "state"
+        type: "STRING"
+        column: "state"
+      - name: "city"
+        type: "STRING"
+        column: "city"
+
+  closed_deal:
+    name: "closed_deal"
+    display_name: "Closed Deal"
+    description: "Marketing closed deal attributes"
+    entity: "fact_closed_deal"
+    key_column: "source_mql_id"
+    attributes:
+      - name: "business_type"
+        type: "STRING"
+        column: "business_type"
+      - name: "business_segment"
+        type: "STRING"
+        column: "business_segment"
+
+  marketplace_payment:
+    name: "marketplace_payment"
+    display_name: "Marketplace Payment"
+    description: "Payment transaction attributes"
+    entity: "fact_marketplace_payment"
+    key_column: "source_order_id"
+    attributes:
+      - name: "payment_type"
+        type: "STRING"
+        column: "payment_type"
+
+  marketplace_review:
+    name: "marketplace_review"
+    display_name: "Marketplace Review"
+    description: "Customer review score attributes"
+    entity: "fact_marketplace_review"
+    key_column: "source_review_id"
+    attributes:
+      - name: "review_score"
+        type: "INTEGER"
+        column: "review_score"
+

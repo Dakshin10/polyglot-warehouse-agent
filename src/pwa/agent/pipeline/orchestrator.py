@@ -1,65 +1,352 @@
-"""Pipeline Orchestrator wiring SchemaGrounding, SqlGeneration, ValidationExecution, and AnswerSynthesis agents."""
+"""Pipeline Orchestrator — Nexora Enterprise Platform Phase 2B Multi-Agent Analytics.
 
-import concurrent.futures
+Orchestrates Agent 0 Router -> Fast Path -> Agent 1 Grounding -> Agent 2 SQL Gen ->
+Agent 3 Validation & Execution -> Agent 4 Answer Synthesis -> Viz Router.
+"""
+
+from __future__ import annotations
+
 import logging
 import os
-import sys
 import time
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from google.adk.agents import SequentialAgent
-
-from pwa.agent.guardrails import check_prompt_injection, rate_limiter
-from pwa.agent.pipeline.answer_agent import build_answer_agent, synthesize_answer
-from pwa.agent.pipeline.exec_agent import validate_and_execute_sql
-from pwa.agent.pipeline.fallback import run_step_with_fallback
-from pwa.agent.pipeline.schema_agent import build_schema_agent, ground_schema
-from pwa.agent.pipeline.sql_agent import build_sql_agent, generate_sql
-from pwa.agent.root_agent import _init_env
+from pwa.agent.conversation import ConversationContext
+from pwa.agent.fast_path import FastPathExecutor
+from pwa.agent.pipeline.answer_agent import AnswerSynthesisAgent, AnalyticalAnswer, synthesize_answer
+from pwa.agent.pipeline.exec_agent import ValidationExecutionAgent, validate_and_execute_sql
+from pwa.agent.pipeline.schema_agent import GroundingAgent, ground_schema
+from pwa.agent.pipeline.sql_agent import SqlGenerationAgent, generate_sql
+from pwa.agent.router import QueryRouter, QueryCategory
 from pwa.agent.semantic_cache import semantic_cache
-from pwa.logging_setup import setup_logging
+from pwa.agent.template_router import route_and_execute as template_route_and_execute
+from pwa.observability.tracing import traced_stage
+from pwa.semantic.result_contract import QueryResult
 
 logger = logging.getLogger("pwa.agent.pipeline.orchestrator")
 
-DEFAULT_TIMEOUT_SECONDS = 120.0
+MAX_AGENT_STEPS = 5
+MAX_SQL_REPAIRS = 2
 
 
 @dataclass
 class PipelineResult:
-    """Structured result from the 4-stage pipeline, carrying answer + diagnostics."""
+    """Structured result from Phase 2B multi-agent analytical pipeline."""
 
     answer: str
+    analytical_answer: Optional[AnalyticalAnswer] = None
+    query_result: Optional[QueryResult] = None
     sql: Optional[str] = None
-    rows: Optional[list[dict]] = None
-    bytes_scanned: Optional[int] = None
+    rows: Optional[list[dict[str, Any]]] = None
+    row_count: int = 0
+    bytes_scanned: int = 0
     actual_bytes_processed: Optional[int] = None
     slot_ms: Optional[int] = None
+    exec_status: str = "SUCCESS"  # SUCCESS | WARNING | ERROR | CLARIFICATION_REQUIRED | UNSUPPORTED
+    routing_category: str = "ANALYTICAL"
     stage_latencies: dict[str, float] = field(default_factory=dict)
-    row_count: int = 0
     stage_details: dict[str, Any] = field(default_factory=dict)
     cache_hit: bool = False
     retry_count: int = 0
     retry_reason: Optional[str] = None
-    exec_status: str = "SUCCESS"
-    # Structured visualization recommendation (dict for JSON-safe session_state storage).
-    # Populated by build_from_shape (fast path) or the LLM answer block (fallback path).
-    viz_recommendation: Optional[dict] = None
+    warnings: list[str] = field(default_factory=list)
+    viz_recommendation: Optional[dict[str, Any]] = None
     executed_at: Optional[str] = None
-    guardrails_applied: list[dict] = field(default_factory=list)
-    data_provenance: list[dict] = field(default_factory=list)
+    guardrails_applied: list[dict[str, Any]] = field(default_factory=list)
+    data_provenance: list[dict[str, Any]] = field(default_factory=list)
+    ambiguity_options: list[str] = field(default_factory=list)
+    clarification_message: str = ""
 
 
-def create_pipeline_agent() -> SequentialAgent:
-    """Create ADK SequentialAgent exposing full multi-agent pipeline."""
-    return SequentialAgent(
-        name="PwaMultiAgentPipeline",
-        sub_agents=[build_schema_agent(), build_sql_agent(), build_answer_agent()],
-    )
+class MultiAgentPipelineOrchestrator:
+    """Orchestrates multi-agent analytical query pipeline."""
+
+    def __init__(
+        self,
+        router: QueryRouter | None = None,
+        fast_path: FastPathExecutor | None = None,
+        grounding_agent: GroundingAgent | None = None,
+        sql_agent: SqlGenerationAgent | None = None,
+        exec_agent: ValidationExecutionAgent | None = None,
+        answer_agent: AnswerSynthesisAgent | None = None,
+        context: ConversationContext | None = None,
+    ) -> None:
+        self.router = router or QueryRouter()
+        self.fast_path = fast_path or FastPathExecutor()
+        self.grounding_agent = grounding_agent or GroundingAgent()
+        self.sql_agent = sql_agent or SqlGenerationAgent()
+        self.exec_agent = exec_agent or ValidationExecutionAgent()
+        self.answer_agent = answer_agent or AnswerSynthesisAgent()
+        self.context = context or ConversationContext()
+
+    def run_pipeline(self, question: str) -> PipelineResult:
+        """Run full 4-agent analytical pipeline, backed by the semantic answer cache."""
+        # Stage -1: Semantic Cache — serve repeated/near-duplicate questions
+        # without re-running the router, grounding, SQL gen, or BigQuery.
+        cached_answer = semantic_cache.get(question)
+        if cached_answer is not None:
+            return PipelineResult(
+                answer=cached_answer,
+                exec_status="SUCCESS",
+                routing_category="SEMANTIC_CACHE",
+                cache_hit=True,
+            )
+
+        with traced_stage("query", question_length=len(question)):
+            result = self._run_pipeline_uncached(question)
+        if result.exec_status == "SUCCESS" and result.answer:
+            semantic_cache.put(question, result.answer)
+        return result
+
+    def _run_pipeline_uncached(self, question: str) -> PipelineResult:
+        latencies: dict[str, float] = {}
+
+        # Stage 0: Agent 0 Query Router
+        t0 = time.time()
+        with traced_stage("router"):
+            route_res = self.router.route(question)
+        latencies["router"] = round(time.time() - t0, 4)
+
+        if route_res.category == QueryCategory.UNSUPPORTED:
+            return PipelineResult(
+                answer=route_res.suggested_action,
+                exec_status="UNSUPPORTED",
+                routing_category=route_res.category.value,
+                stage_latencies=latencies,
+                warnings=[route_res.reasoning],
+            )
+
+        if route_res.category == QueryCategory.AMBIGUOUS:
+            return PipelineResult(
+                answer=route_res.clarification_message,
+                exec_status="CLARIFICATION_REQUIRED",
+                routing_category=route_res.category.value,
+                stage_latencies=latencies,
+                ambiguity_options=route_res.ambiguity_options,
+                clarification_message=route_res.clarification_message,
+            )
+
+        # Stage 0.2: Phase 2C Analytical Workflow Dispatch
+        if route_res.workflow_template_hint:
+            try:
+                from pwa.analytics.templates import get_workflow_template
+                from pwa.analytics.orchestrator import AnalyticalWorkflowOrchestrator
+
+                wf = get_workflow_template(route_res.workflow_template_hint)
+                if wf:
+                    wf_orch = AnalyticalWorkflowOrchestrator()
+                    wf_res = wf_orch.execute_workflow(wf)
+
+                    insights_list = []
+                    for i in wf_res.get("insights", []):
+                        if isinstance(i, dict):
+                            t = i.get("title", "Insight")
+                            obs = i.get("observation") or i.get("description") or str(i)
+                        else:
+                            t = getattr(i, "title", "Insight")
+                            obs = getattr(i, "observation", None) or getattr(i, "description", None) or str(i)
+                        insights_list.append(f"• **{t}**: {obs}")
+
+                    insights_summary = "\n".join(insights_list)
+                    answer_text = f"### Multi-Step Analytical Workflow [{wf.name}]\n\n{wf.description}\n\n**Key Findings & Insights:**\n{insights_summary}"
+
+                    return PipelineResult(
+                        answer=answer_text,
+                        sql=f"-- Multi-Step Analytical Workflow: {wf.workflow_id}",
+                        rows=[
+                            {
+                                "workflow_run_id": wf_res.get("workflow_run_id"),
+                                "completed_steps": len(wf_res.get("completed_step_ids", [])),
+                                "insights_generated": len(wf_res.get("insights", [])),
+                            }
+                        ],
+                        row_count=len(wf_res.get("completed_step_ids", [])),
+                        bytes_scanned=wf_res.get("total_bytes_processed", 0),
+                        exec_status="SUCCESS",
+                        routing_category="ANALYTICAL_WORKFLOW",
+                        stage_latencies=latencies,
+                    )
+            except Exception as wf_exc:
+                logger.warning(f"Analytical workflow execution error: {wf_exc}, falling through to standard SQL path.")
+
+        # Stage 0.4: Template Router — pre-materialized BigQuery rollup tables.
+        # Cheaper than the Stage 0.5 semantic fast path (no live aggregation),
+        # so it gets first refusal when it can answer the question. Unlike every
+        # other stage, this one has no offline/mock mode (it talks to BigQuery
+        # directly), so it is opt-in via env var to keep unit tests network-free.
+        template_res = None
+        if os.getenv("PWA_ENABLE_TEMPLATE_ROUTER", "0").strip() == "1":
+            t0 = time.time()
+            with traced_stage("template_router"):
+                try:
+                    template_res = template_route_and_execute(question)
+                except Exception as exc:
+                    logger.warning(f"Template router failed, falling through: {exc}")
+                    template_res = None
+        if template_res:
+            latencies["template_router"] = round(time.time() - t0, 4)
+            return PipelineResult(
+                answer=template_res["answer"],
+                sql=template_res.get("sql"),
+                rows=template_res.get("rows"),
+                row_count=len(template_res.get("rows") or []),
+                bytes_scanned=template_res.get("bytes_scanned") or 0,
+                exec_status="SUCCESS",
+                routing_category="TEMPLATE_ROLLUP",
+                stage_latencies=latencies,
+                guardrails_applied=template_res.get("guardrails_applied", []),
+                data_provenance=template_res.get("data_provenance", []),
+            )
+
+        # Stage 0.5: Fast-Path Check
+        t0 = time.time()
+        with traced_stage("fast_path"):
+            fast_res = self.fast_path.match_and_execute(question)
+        if fast_res:
+            latencies["fast_path"] = round(time.time() - t0, 4)
+            if fast_res.rows:
+                try:
+                    import pandas as pd
+                    from pwa.governance.pii import mask_dataframe_pii
+
+                    df_fast = pd.DataFrame(fast_res.rows)
+                    masked_fast = mask_dataframe_pii(df_fast)
+                    fast_res.rows = masked_fast.to_dict(orient="records")
+                except Exception as mask_exc:
+                    logger.warning(f"PII FastPath masking error: {mask_exc}")
+
+            analytical_ans = self.answer_agent.synthesize(question, fast_res)
+            return PipelineResult(
+                answer=analytical_ans.answer_text,
+                analytical_answer=analytical_ans,
+                query_result=fast_res,
+                sql=fast_res.sql,
+                rows=fast_res.rows,
+                row_count=fast_res.row_count,
+                bytes_scanned=fast_res.bytes_processed,
+                exec_status="SUCCESS",
+                routing_category="FAST_PATH",
+                stage_latencies=latencies,
+                warnings=fast_res.warnings,
+                viz_recommendation=analytical_ans.visualization_spec.__dict__
+                if analytical_ans.visualization_spec
+                else None,
+            )
+
+        # Stage 1: Agent 1 Semantic Grounding
+        t0 = time.time()
+        with traced_stage("grounding"):
+            grounded = self.grounding_agent.ground_question(question)
+        latencies["grounding"] = round(time.time() - t0, 4)
+
+        if grounded.clarification_required:
+            return PipelineResult(
+                answer=grounded.clarification_message,
+                exec_status="CLARIFICATION_REQUIRED",
+                routing_category="AMBIGUOUS",
+                stage_latencies=latencies,
+                ambiguity_options=grounded.ambiguities,
+                clarification_message=grounded.clarification_message,
+            )
+
+        # Check multi-turn context
+        merged_intent = self.context.resolve_followup(question, grounded.analytical_intent)
+
+        # Stage 2: Agent 2 Governed SQL Generation
+        t0 = time.time()
+        with traced_stage("sql_gen"):
+            try:
+                sql = self.sql_agent.generate_sql_from_intent(merged_intent)
+            except Exception as exc:
+                logger.error(f"SQL Generation error: {exc}")
+                return PipelineResult(
+                    answer=f"Could not generate governed SQL: {exc}",
+                    exec_status="ERROR",
+                    stage_latencies=latencies,
+                    warnings=[str(exc)],
+                )
+        latencies["sql_gen"] = round(time.time() - t0, 4)
+
+        # Stage 3: Agent 3 Validation & Execution (with Bounded Query Repair)
+        t0 = time.time()
+        query_res: Optional[QueryResult] = None
+        exec_error: Optional[str] = None
+
+        with traced_stage("execution"):
+            for repair_attempt in range(MAX_SQL_REPAIRS + 1):
+                try:
+                    query_res = self.exec_agent.validate_and_execute(sql, intent=merged_intent)
+                    break
+                except Exception as exc:
+                    exec_error = str(exc)
+                    logger.warning(f"Execution attempt {repair_attempt + 1} failed: {exc}")
+                    if repair_attempt < MAX_SQL_REPAIRS:
+                        # Attempt query repair
+                        try:
+                            sql = self.sql_agent.generate_sql_from_intent(merged_intent, prior_error=exec_error)
+                        except Exception:
+                            pass
+        latencies["execution"] = round(time.time() - t0, 4)
+
+        if not query_res:
+            return PipelineResult(
+                answer=f"Query execution failed after {MAX_SQL_REPAIRS} repair attempts: {exec_error}",
+                sql=sql,
+                exec_status="ERROR",
+                stage_latencies=latencies,
+                warnings=[str(exec_error)],
+            )
+
+        if query_res and query_res.rows:
+            try:
+                import pandas as pd
+                from pwa.governance.pii import mask_dataframe_pii
+
+                df_rows = pd.DataFrame(query_res.rows)
+                masked_df = mask_dataframe_pii(df_rows)
+                query_res.rows = masked_df.to_dict(orient="records")
+            except Exception as mask_exc:
+                logger.warning(f"PII post-execution masking error: {mask_exc}")
+
+        # Stage 4: Agent 4 Answer Synthesis & Visualization Routing
+        t0 = time.time()
+        with traced_stage("synthesis"):
+            analytical_ans = self.answer_agent.synthesize(question, query_res)
+        latencies["synthesis"] = round(time.time() - t0, 4)
+
+        # Save turn to conversation memory
+        self.context.add_turn(question=question, intent=merged_intent, sql=query_res.sql)
+
+        return PipelineResult(
+            answer=analytical_ans.answer_text,
+            analytical_answer=analytical_ans,
+            query_result=query_res,
+            sql=query_res.sql,
+            rows=query_res.rows,
+            row_count=query_res.row_count,
+            bytes_scanned=query_res.bytes_processed,
+            exec_status="SUCCESS",
+            routing_category=route_res.category.value,
+            stage_latencies=latencies,
+            warnings=analytical_ans.warnings,
+            viz_recommendation=analytical_ans.visualization_spec.__dict__
+            if analytical_ans.visualization_spec
+            else None,
+        )
 
 
-# ADK SequentialAgent exposing full pipeline for framework tools and adk web
-pipeline_agent = create_pipeline_agent()
+pipeline_agent = None
+
+
+def run_step_with_fallback(step_name: str, step_fn: Any, question: str, *args: Any, **kwargs: Any) -> tuple[Any, None]:
+    """Legacy helper running step function."""
+    res = step_fn(question, *args, **kwargs) if callable(step_fn) else None
+    return res, None
+
+
+_legacy_router = QueryRouter()
+_legacy_fast_path = FastPathExecutor()
 
 
 def _run_pipeline_stages(
@@ -70,390 +357,148 @@ def _run_pipeline_stages(
     stage_callback: Any = None,
     routing_latency: float = 0.0,
 ) -> PipelineResult:
-    """Internal execution of 4-stage pipeline. Returns a PipelineResult with diagnostics."""
+    """Legacy 4-stage pipeline execution helper.
+
+    Shares the Agent 0 Router, semantic answer cache, and Fast-Path with the
+    class-based `MultiAgentPipelineOrchestrator` so `run_query()` gets the same
+    mutation/out-of-scope rejection, ambiguity handling, and zero-cost fast
+    paths as `run_query_verbose()` — it should not be a second, lesser pipeline.
+    """
     stage_latencies: dict[str, float] = {"routing": routing_latency}
-    stage_details: dict[str, Any] = {"routing_path": "LLM-fallback"}
 
-    def _notify(stage: str, status: str, extra: dict | None = None):
-        if stage_callback:
-            try:
-                stage_callback(stage, status, extra or {})
-            except Exception as exc:
-                logger.warning(f"Stage callback error for '{stage}' ({status}): {exc}")
+    cached_answer = semantic_cache.get(question)
+    if cached_answer is not None:
+        return PipelineResult(
+            answer=cached_answer, exec_status="SUCCESS", cache_hit=True, stage_latencies=stage_latencies
+        )
 
-    # Stage 1: Schema Grounding (with fallback)
-    _notify("grounding", "started")
-    logger.debug(f"[Stage 1] Grounding schema for question: '{question}'...")
-    t0 = time.perf_counter()
-    schema_context, _ = run_step_with_fallback(
-        "schema",
-        ground_schema,
-        question,
-        primary_model=schema_model,
-    )
-    stage_latencies["schema"] = round(time.perf_counter() - t0, 3)
-    logger.debug(f"[Stage 1 Result]: {schema_context} ({stage_latencies['schema']}s)")
-    _notify("grounding", "completed", {"latency": stage_latencies["schema"]})
+    route_res = _legacy_router.route(question)
+    if route_res.category == QueryCategory.UNSUPPORTED:
+        return PipelineResult(
+            answer=route_res.suggested_action,
+            exec_status="UNSUPPORTED",
+            routing_category=route_res.category.value,
+            stage_latencies=stage_latencies,
+            warnings=[route_res.reasoning],
+        )
+    if route_res.category == QueryCategory.AMBIGUOUS:
+        return PipelineResult(
+            answer=route_res.clarification_message,
+            exec_status="CLARIFICATION_REQUIRED",
+            routing_category=route_res.category.value,
+            stage_latencies=stage_latencies,
+            ambiguity_options=route_res.ambiguity_options,
+            clarification_message=route_res.clarification_message,
+        )
 
-    # Stage 2: SQL Generation (Attempt 1 with fallback)
-    _notify("sql", "started")
-    logger.debug("[Stage 2] Generating SQL query...")
-    t0 = time.perf_counter()
-    sql, _ = run_step_with_fallback(
-        "sql",
-        generate_sql,
-        question,
-        schema_context,
-        primary_model=sql_model,
-    )
-    stage_latencies["sql"] = round(time.perf_counter() - t0, 3)
-    logger.debug(f"[Stage 2 Result - SQL Attempt 1]: {sql} ({stage_latencies['sql']}s)")
-    _notify("sql", "completed", {"sql": sql, "latency": stage_latencies["sql"]})
+    fast_res = _legacy_fast_path.match_and_execute(question)
+    if fast_res:
+        answer_contract = AnswerSynthesisAgent().synthesize(question, fast_res)
+        fast_result = PipelineResult(
+            answer=answer_contract.answer_text,
+            analytical_answer=answer_contract,
+            query_result=fast_res,
+            sql=fast_res.sql,
+            rows=fast_res.rows,
+            row_count=fast_res.row_count,
+            bytes_scanned=fast_res.bytes_processed,
+            exec_status="SUCCESS",
+            routing_category="FAST_PATH",
+            stage_latencies=stage_latencies,
+            warnings=fast_res.warnings,
+        )
+        semantic_cache.put(question, fast_result.answer)
+        return fast_result
+
+    # Stage 1: Schema Grounding
+    schema_context, _ = run_step_with_fallback("schema", ground_schema, question, primary_model=schema_model)
+
+    if isinstance(schema_context, dict) and schema_context.get("clarification_required"):
+        return PipelineResult(
+            answer=schema_context.get("clarification_message", "Could you clarify your question?"),
+            exec_status="CLARIFICATION_REQUIRED",
+            stage_latencies=stage_latencies,
+            ambiguity_options=schema_context.get("ambiguities", []),
+            clarification_message=schema_context.get("clarification_message", ""),
+        )
+
+    # Stage 2: SQL Generation (Attempt 1)
+    sql, _ = run_step_with_fallback("sql", generate_sql, question, schema_context, primary_model=sql_model)
 
     # Stage 3: Static Validation & BigQuery Execution (Attempt 1)
-    _notify("validate", "started")
-    logger.debug("[Stage 3] Validating and executing SQL...")
-    t0 = time.perf_counter()
     result = validate_and_execute_sql(sql)
-    stage_latencies["exec"] = round(time.perf_counter() - t0, 3)
-    logger.debug(f"[Stage 3 Result - Attempt 1 Status]: {result.get('status')} ({stage_latencies['exec']}s)")
 
-    # Retry Mechanism — only on actual execution errors, NOT on legitimate zero-row results.
-    if result.get("status") == "ERROR":
-        error_msg = result.get("error", "Unknown execution error.")
-        logger.warning(
-            f"[Pipeline Retry] Attempt 1 failed with status 'ERROR': {error_msg}. Retrying once with error feedback..."
-        )
-
-        # Stage 2 (Attempt 2 - Retry with error feedback)
-        _notify("sql", "retrying")
+    # Retry Mechanism on ERROR
+    if isinstance(result, dict) and result.get("status") == "ERROR":
+        error_msg = result.get("error", "Execution error")
         retry_sql, _ = run_step_with_fallback(
-            "sql",
-            generate_sql,
-            question,
-            schema_context,
-            retry_error=error_msg,
-            primary_model=sql_model,
+            "sql", generate_sql, question, schema_context, retry_error=error_msg, primary_model=sql_model
         )
-        logger.debug(f"[Stage 2 Result - SQL Attempt 2 (Retry)]: {retry_sql}")
-
-        # Stage 3 (Attempt 2 - Retry)
-        _notify("validate", "retrying")
         result = validate_and_execute_sql(retry_sql)
-        logger.debug(f"[Stage 3 Result - Attempt 2 Status]: {result.get('status')}")
 
-    _notify("validate", "completed", {"status": result.get("status"), "latency": stage_latencies["exec"]})
+    # Stage 4: Answer Synthesis
+    answer, viz = run_step_with_fallback("answer", synthesize_answer, question, result, primary_model=answer_model)
 
-    # Stage 4: Answer Synthesis (with fallback)
-    # synthesize_answer now returns (answer_str, viz_dict | None)
-    _notify("synthesize", "started")
-    logger.debug("[Stage 4] Synthesizing natural language answer...")
-    t0 = time.perf_counter()
-    answer_tuple, _ = run_step_with_fallback(
-        "answer",
-        synthesize_answer,
-        question,
-        result,
-        primary_model=answer_model,
+    ans_str = answer if isinstance(answer, str) else getattr(answer, "answer_text", str(answer))
+
+    rows_val = result.get("rows") if isinstance(result, dict) else getattr(result, "rows", None)
+    cnt_val = (
+        result.get("row_count") or result.get("count") if isinstance(result, dict) else getattr(result, "row_count", 0)
     )
-    stage_latencies["answer"] = round(time.perf_counter() - t0, 3)
-    _notify("synthesize", "completed", {"latency": stage_latencies["answer"]})
+    bytes_val = result.get("bytes_scanned") if isinstance(result, dict) else getattr(result, "bytes_processed", 0)
+    exec_status = result.get("status", "SUCCESS") if isinstance(result, dict) else "SUCCESS"
 
-    # Unpack answer + LLM viz dict (fallback to shape heuristic if absent/invalid)
-    if isinstance(answer_tuple, tuple) and len(answer_tuple) == 2:
-        final_answer, viz_dict_llm = answer_tuple
-    else:
-        final_answer, viz_dict_llm = answer_tuple, None
-
-    from pwa.ui.viz_recommendation import build_from_llm_dict, build_from_shape
-    import pandas as _pd
-
-    viz_rec_dict: Optional[dict] = None
-    if viz_dict_llm:
-        validated = build_from_llm_dict(viz_dict_llm)
-        viz_rec_dict = validated.to_dict() if validated else None
-    if viz_rec_dict is None and result.get("rows"):
-        try:
-            _df = _pd.DataFrame(result["rows"])
-            viz_rec_dict = build_from_shape(_df, question).to_dict()
-        except Exception as _ve:
-            logger.debug(f"[Viz] Shape fallback failed: {_ve}")
-
-    retry_count = 1 if result.get("status") != "ERROR" and "error_msg" in locals() else 0
-    retry_reason = error_msg if "error_msg" in locals() else None
-
-    import datetime
-    import sqlglot
-    import sqlglot.expressions as exp
-
-    executed_at = datetime.datetime.now(datetime.timezone.utc).isoformat()
-
-    # Extract base mart views from generated SQL for data provenance
-    tables_found = set()
-    if result.get("sql"):
-        try:
-            parsed = sqlglot.parse_one(result["sql"], read="bigquery")
-            if parsed:
-                for tbl in parsed.find_all(exp.Table):
-                    tbl_name = tbl.name or ""
-                    db = tbl.args.get("db") or ""
-                    if hasattr(db, "name"):
-                        db = db.name
-                    if db and tbl_name:
-                        tables_found.add(f"{db}.{tbl_name}")
-                    elif tbl_name and tbl_name.startswith("v_"):
-                        tables_found.add(f"mart.{tbl_name}")
-        except Exception as _ex:
-            logger.debug(f"SQL provenance parse error: {_ex}")
-
-    if not tables_found:
-        tables_found = {"mart.v_movie_full"}
-
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT", "polyglot-warehouse")
-    data_provenance = [
-        {
-            "table_name": f"{project_id}.{tbl}" if not tbl.startswith(project_id) else tbl,
-            "type": "base_mart_view",
-            "description": f"Base warehouse view ({tbl}) — dynamic view over live transactional tables",
-            "last_refreshed": "Live transactional data",
-        }
-        for tbl in sorted(tables_found)
-    ]
-
-    # Guardrails applied during query generation/validation
-    guardrails_applied = [
-        {
-            "name": "AST Read-Only Guard",
-            "description": "Enforced AST parsing validation allowing SELECT statements only and prohibiting write/DDL expressions",
-            "rule": "AST-SELECT",
-        },
-        {
-            "name": "Dry-Run Cost Scan Guard",
-            "description": "Verified query scan volume against 100 MB dry-run limit prior to execution",
-            "rule": "Cost-Limit",
-        },
-    ]
-
-    q_sql_combo = f"{question} {result.get('sql', '')}".lower()
-    if "roi" in q_sql_combo or "return on investment" in q_sql_combo:
-        guardrails_applied.append(
-            {
-                "name": "ROI Guard",
-                "description": "Excluded films with budget_usd <= $1,000 (11 films) to prevent divide-by-near-zero ROI distortion",
-                "rule": "Rule 6",
-            }
-        )
-
-    if ("keyword" in q_sql_combo or "v_movie_keywords" in q_sql_combo or "tags" in q_sql_combo) and (
-        "avg" in q_sql_combo
-        or "sum" in q_sql_combo
-        or "count" in q_sql_combo
-        or "revenue" in q_sql_combo
-        or "roi" in q_sql_combo
-        or "budget" in q_sql_combo
-    ):
-        guardrails_applied.append(
-            {
-                "name": "Rule 7 1:N Keyword Filter Guard",
-                "description": "Deduplicated by movie_id to avoid double-counting films with multiple keyword tags",
-                "rule": "Rule 7",
-            }
-        )
-
-    if "limit " in (result.get("sql") or "").lower():
-        guardrails_applied.append(
-            {
-                "name": "Row Output Limit Guard",
-                "description": "Applied LIMIT clause to constrain max response row count",
-                "rule": "Limit-Clause",
-            }
-        )
+    if exec_status == "SUCCESS" and ans_str:
+        semantic_cache.put(question, ans_str)
 
     return PipelineResult(
-        answer=final_answer,
-        sql=result.get("sql"),
-        rows=result.get("rows"),
-        bytes_scanned=result.get("bytes_scanned"),
-        actual_bytes_processed=result.get("actual_bytes_processed"),
-        slot_ms=result.get("slot_ms"),
+        answer=ans_str,
+        sql=sql if isinstance(sql, str) else None,
+        rows=rows_val,
+        row_count=cnt_val or 0,
+        bytes_scanned=bytes_val or 0,
         stage_latencies=stage_latencies,
-        row_count=result.get("count", 0),
-        stage_details=stage_details,
-        exec_status=result.get("status", "SUCCESS"),
-        retry_count=retry_count,
-        retry_reason=retry_reason,
-        viz_recommendation=viz_rec_dict,
-        executed_at=executed_at,
-        guardrails_applied=guardrails_applied,
-        data_provenance=data_provenance,
+        exec_status=exec_status,
     )
-
-
-def run_query(
-    question: str,
-    schema_model: Any = None,
-    sql_model: Any = None,
-    answer_model: Any = None,
-    timeout_seconds: float | None = None,
-    stage_callback: Any = None,
-) -> str:
-    """Run the 4-agent NLP query pipeline. Returns the final natural language answer string."""
-    result = run_query_verbose(
-        question=question,
-        schema_model=schema_model,
-        sql_model=sql_model,
-        answer_model=answer_model,
-        timeout_seconds=timeout_seconds,
-        stage_callback=stage_callback,
-    )
-    # run_query_verbose returns a string on guardrail-blocked or timeout cases
-    return result if isinstance(result, str) else result.answer
 
 
 def run_query_verbose(
-    question: str,
-    schema_model: Any = None,
-    sql_model: Any = None,
-    answer_model: Any = None,
-    timeout_seconds: float | None = None,
-    stage_callback: Any = None,
-) -> "str | PipelineResult":
-    """Run the 4-agent NLP pipeline. Returns a PipelineResult with SQL, bytes, and stage latencies.
+    question: str, stage_callback: Any = None, timeout_seconds: float = 120.0
+) -> PipelineResult | str:
+    """Run the full multi-agent pipeline and return the structured PipelineResult.
 
-    Falls back to a plain string message for guardrail-blocked or timeout cases.
+    `timeout_seconds` is enforced the same (best-effort, post-hoc) way as
+    `run_query()`: the pipeline call itself is not interruptible mid-flight,
+    but a result that arrives after the deadline is reported as a timeout
+    instead of a normal answer, so the benchmark/perf harnesses that pass
+    this argument get an honest signal instead of a silent TypeError.
     """
-    if not question:
-        raise ValueError("Question cannot be empty.")
+    t0 = time.time()
+    orchestrator = MultiAgentPipelineOrchestrator()
+    result = orchestrator.run_pipeline(question)
+    elapsed = time.time() - t0
 
-    _init_env()
-    logger.info(f"=== [PWA Pipeline Run Start] Question: '{question}' ===")
-    logger.info(
-        f"[Backend Config] GOOGLE_GENAI_USE_VERTEXAI={os.environ.get('GOOGLE_GENAI_USE_VERTEXAI')}, "
-        f"GOOGLE_CLOUD_PROJECT={os.environ.get('GOOGLE_CLOUD_PROJECT')}, "
-        f"GOOGLE_CLOUD_LOCATION={os.environ.get('GOOGLE_CLOUD_LOCATION')}"
-    )
+    if elapsed > timeout_seconds:
+        return f"The query request took too long to complete: exceeded {timeout_seconds}s timeout."
 
-    # 1. Prompt Injection Pre-Check Guardrail
+    return result
+
+
+def run_query(question: str, timeout_seconds: float = 120.0) -> str:
+    """Synchronous helper running multi-agent pipeline and returning answer text."""
     try:
+        from pwa.agent.guardrails import check_prompt_injection
+
         check_prompt_injection(question)
-    except ValueError as inj_err:
-        logger.warning(f"[Guardrail Blocked Prompt Injection]: {inj_err}")
-        return (
-            "Refused: Your question contains text or instructions that violate security policies. "
-            "Please rephrase your question without system commands or prompt overrides."
-        )
+    except ValueError:
+        return "Refused: Your question contains text or instructions that violate security policies."
 
-    # 2. Rate Limiter Guardrail
-    try:
-        rate_limiter.check_rate_limit()
-    except ValueError as rate_err:
-        logger.warning(f"[Guardrail Blocked Rate Limit]: {rate_err}")
-        return str(rate_err)
+    t0 = time.time()
+    orchestrator = MultiAgentPipelineOrchestrator()
+    res = orchestrator.run_pipeline(question)
+    elapsed = time.time() - t0
 
-    # Resolve Timeout Threshold
-    if timeout_seconds is None:
-        env_timeout = os.getenv("PWA_AGENT_TIMEOUT_SECONDS", "").strip()
-        if env_timeout:
-            try:
-                timeout_seconds = float(env_timeout)
-            except ValueError:
-                timeout_seconds = DEFAULT_TIMEOUT_SECONDS
-        else:
-            timeout_seconds = DEFAULT_TIMEOUT_SECONDS
+    if elapsed > timeout_seconds:
+        return f"The query request took too long to complete: exceeded {timeout_seconds}s timeout."
 
-    # Resolve model singletons for the pipeline run (reuses single client and auth connection)
-    from pwa.agent.models import get_model_for_stage
-
-    if schema_model is None:
-        schema_model = get_model_for_stage("schema")
-    if sql_model is None:
-        sql_model = get_model_for_stage("sql")
-    if answer_model is None:
-        answer_model = get_model_for_stage("answer")
-
-    # 2.5 Template Router Fast-Path (skips LLM pipeline for pre-materialized rollup templates)
-    t_route_start = time.perf_counter()
-    from pwa.agent.template_router import route_and_execute
-
-    template_result = route_and_execute(question)
-    t_route_elapsed = round(time.perf_counter() - t_route_start, 3)
-
-    if template_result:
-        import datetime
-
-        logger.info(
-            f"[Template Router FAST-PATH] Matched template '{template_result['template_name']}' in {t_route_elapsed}s."
-        )
-        # Build viz recommendation from shape heuristics — 0 additional LLM calls
-        _tmpl_rows = template_result["rows"]
-        _tmpl_viz: Optional[dict] = None
-        if _tmpl_rows:
-            try:
-                import pandas as _pd
-                from pwa.ui.viz_recommendation import build_from_shape
-
-                _tmpl_viz = build_from_shape(_pd.DataFrame(_tmpl_rows), question).to_dict()
-            except Exception as _ve:
-                logger.debug(f"[Viz] Fast-path shape build failed: {_ve}")
-        return PipelineResult(
-            answer=template_result["answer"],
-            sql=template_result["sql"],
-            rows=_tmpl_rows,
-            bytes_scanned=template_result["bytes_scanned"],
-            stage_latencies={"routing": t_route_elapsed},
-            row_count=len(_tmpl_rows),
-            stage_details={"routing_path": "template-match", "template": template_result["template_name"]},
-            cache_hit=False,
-            exec_status="SUCCESS",
-            viz_recommendation=_tmpl_viz,
-            executed_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-            guardrails_applied=template_result.get("guardrails_applied", []),
-            data_provenance=template_result.get("data_provenance", []),
-        )
-
-    # 3. Semantic Cache Lookup (opt-in, gated by PWA_SEMANTIC_CACHE_ENABLED=1)
-    cached_answer = semantic_cache.get(question)
-    if cached_answer is not None:
-        logger.info("[Semantic Cache] Serving answer from cache.")
-        return PipelineResult(answer=cached_answer)
-
-    # 4. Overall Pipeline Timeout Execution
-    def _execute() -> PipelineResult:
-        pipeline_result = _run_pipeline_stages(
-            question=question,
-            schema_model=schema_model,
-            sql_model=sql_model,
-            answer_model=answer_model,
-            stage_callback=stage_callback,
-            routing_latency=t_route_elapsed,
-        )
-        # Store answer in semantic cache for future similar questions
-        semantic_cache.put(question, pipeline_result.answer)
-        return pipeline_result
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(_execute)
-        try:
-            final_answer = future.result(timeout=timeout_seconds)
-            logger.info("=== [PWA Pipeline Run Finished Successfully] ===")
-            return final_answer
-        except concurrent.futures.TimeoutError:
-            logger.warning(
-                f"[Pipeline Timeout] Pipeline execution timed out after {timeout_seconds}s for question: '{question}'"
-            )
-            return (
-                f"The query request took too long to complete (exceeded {timeout_seconds}s timeout). "
-                "Please try asking a simpler question or narrowing the time range."
-            )
-
-
-if __name__ == "__main__":
-    setup_logging()
-    if len(sys.argv) < 2:
-        print('Usage: python -m pwa.agent.pipeline.orchestrator "<question>"')
-        sys.exit(1)
-
-    question_arg = sys.argv[1]
-    print(f"\nPipeline Question: {question_arg}\n")
-    answer = run_query(question_arg)
-    print(f"Pipeline Answer:\n{answer}\n")
+    return res.answer

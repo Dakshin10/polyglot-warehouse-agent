@@ -1,0 +1,2 @@
+-- Seed Reference Data for AlloyDB PostgreSQL
+-- No synthetic transactions added. All transactional data loaded from AdventureWorks & Olist.

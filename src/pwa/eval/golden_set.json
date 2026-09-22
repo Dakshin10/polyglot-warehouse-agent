@@ -1,122 +1,122 @@
 [
   {
     "id": "G01",
-    "question": "Which movie had the highest revenue?",
+    "question": "What was the total sales revenue in 2014?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["Avatar", "revenue", "billion", "highest"]
+    "expected_answer_keywords": ["2014", "sales", "revenue", "total"]
   },
   {
     "id": "G02",
-    "question": "What is the average vote rating across all movies?",
+    "question": "Which product category generated the most revenue?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["average", "rating", "vote"]
+    "expected_answer_keywords": ["category", "revenue", "highest"]
   },
   {
     "id": "G03",
-    "question": "How many movies are in the Action genre?",
+    "question": "How many employees work in the Sales department?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["action", "movies", "genre"]
+    "expected_answer_keywords": ["sales", "employees", "department"]
   },
   {
     "id": "G04",
-    "question": "Who directed the most movies?",
+    "question": "Who are the top 5 suppliers by total purchase volume?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["director", "movies"]
+    "expected_answer_keywords": ["supplier", "purchase", "total"]
   },
   {
     "id": "G05",
-    "question": "Which 5 movies had the highest profit?",
+    "question": "What is the average marketplace order value?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["profit", "revenue", "budget", "movies"]
+    "expected_answer_keywords": ["average", "order", "marketplace"]
   },
   {
     "id": "G06",
-    "question": "List movies released in 2010 with a vote rating above 7.5",
+    "question": "How many marketplace orders were delivered in 2018?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["2010", "rating"]
+    "expected_answer_keywords": ["2018", "delivered", "orders"]
   },
   {
     "id": "G07",
-    "question": "What keywords are most commonly associated with Horror movies?",
+    "question": "What payment method is most used by marketplace customers?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["horror", "keyword"]
+    "expected_answer_keywords": ["payment", "method", "credit", "boleto"]
   },
   {
     "id": "G08",
-    "question": "Which director has the highest average ROI?",
+    "question": "What is the average review score for marketplace orders?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["director", "roi", "return"]
+    "expected_answer_keywords": ["review", "score", "average"]
   },
   {
     "id": "G09",
-    "question": "How many data integrity exceptions exist in the mart?",
+    "question": "How many data integrity exceptions exist in the platform?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["exception", "integrity"]
+    "expected_answer_keywords": ["integrity", "exception", "zero", "0"]
   },
   {
     "id": "G10",
-    "question": "Which genre earned the most total revenue?",
+    "question": "Which product subcategory has the highest number of units sold?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["genre", "revenue", "total"]
+    "expected_answer_keywords": ["subcategory", "units", "sold"]
   },
   {
     "id": "G11",
-    "question": "What are the top 3 movies directed by Christopher Nolan by revenue?",
+    "question": "Show the top 3 marketplace sellers with the most closed marketing deals.",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["Nolan", "revenue"]
+    "expected_answer_keywords": ["seller", "deals", "marketing"]
   },
   {
     "id": "G12",
-    "question": "What is the average cast size for Drama movies?",
+    "question": "What is the total procurement spend across all suppliers?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["drama", "cast", "average"]
+    "expected_answer_keywords": ["procurement", "spend", "supplier", "total"]
   },
   {
     "id": "G13",
-    "question": "Show the lead actor for the top 5 movies by revenue",
+    "question": "List all products in the Bikes category.",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["actor", "revenue"]
+    "expected_answer_keywords": ["bikes", "product", "category"]
   },
   {
     "id": "G14",
-    "question": "Which movies have more than 50 keywords?",
+    "question": "How many marketplace customers placed more than one order?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["keyword"]
+    "expected_answer_keywords": ["customer", "repeat", "orders"]
   },
   {
     "id": "G15",
-    "question": "What was the most popular movie released in 2000?",
-    "match_mode": "keyword",
-    "expected_answer_keywords": ["2000", "popular"]
-  },
-  {
-    "id": "G16",
-    "question": "What is today's stock price for Apple?",
+    "question": "What is today's stock price for Nexora Technologies?",
     "match_mode": "keyword",
     "expected_answer_keywords": ["not available", "cannot", "warehouse", "out of scope"]
   },
   {
-    "id": "G17",
-    "question": "List movies from the Comedy genre released between 2005 and 2010",
+    "id": "G16",
+    "question": "Which states have the most marketplace customers?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["comedy", "2005", "2010"]
+    "expected_answer_keywords": ["state", "customers", "marketplace"]
+  },
+  {
+    "id": "G17",
+    "question": "What was the total purchase order value in 2013?",
+    "match_mode": "keyword",
+    "expected_answer_keywords": ["2013", "purchase", "total"]
   },
   {
     "id": "G18",
-    "question": "What is the total number of movies in the mart?",
+    "question": "How many sales orders are online versus in-person?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["movies", "total", "count"]
+    "expected_answer_keywords": ["online", "orders", "sales"]
   },
   {
     "id": "G19",
-    "question": "Which movies have both 'alien' and 'space' as keywords?",
+    "question": "What is the declared average monthly revenue of closed marketing deals?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["alien", "space"]
+    "expected_answer_keywords": ["monthly", "revenue", "marketing", "declared"]
   },
   {
     "id": "G20",
-    "question": "What is the highest budget movie in the mart?",
+    "question": "Which preferred suppliers have a credit rating of 1?",
     "match_mode": "keyword",
-    "expected_answer_keywords": ["budget", "highest", "million"]
+    "expected_answer_keywords": ["supplier", "preferred", "credit", "rating"]
   }
 ]

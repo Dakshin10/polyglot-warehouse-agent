@@ -20,10 +20,10 @@ def _make_result(answer: str) -> PipelineResult:
 
 def test_cli_query_oneshot_success(capsys):
     """Verify pwa query "<question>" one-shot mode prints response to stdout and returns 0."""
-    expected = "In 2010, Toy Story 3 had highest revenue."
+    expected = "In 2014, total sales revenue was $5.1M."
     # run_query_verbose is imported inside cmd_query — patch at the orchestrator module level
     with patch("pwa.agent.pipeline.orchestrator.run_query_verbose", return_value=_make_result(expected)):
-        rc = cmd_query("which movie had highest revenue in 2010?", interactive=False, model=None, verbose=False)
+        rc = cmd_query("what was the total sales revenue in 2014?", interactive=False, model=None, verbose=False)
         captured = capsys.readouterr()
 
         assert rc == 0
@@ -50,14 +50,14 @@ def test_cli_query_model_and_verbose_flags(capsys):
 
 def test_cli_query_interactive_loop(capsys):
     """Verify pwa query --interactive REPL loop processes questions until user exits."""
-    inputs = ["who directed Inception?", "quit"]
+    inputs = ["what was the total sales revenue in 2014?", "quit"]
     with patch("builtins.input", side_effect=inputs):
         # Interactive mode uses run_query (not run_query_verbose), also imported inside the function
-        with patch("pwa.agent.pipeline.orchestrator.run_query", return_value="Christopher Nolan directed Inception."):
+        with patch("pwa.agent.pipeline.orchestrator.run_query", return_value="In 2014, total sales revenue was $5.1M."):
             rc = cmd_query("", interactive=True, model=None, verbose=False)
             captured = capsys.readouterr()
 
             assert rc == 0
             assert "Interactive NLP Query CLI" in captured.out
-            assert "Christopher Nolan directed Inception." in captured.out
+            assert "In 2014, total sales revenue was $5.1M." in captured.out
             assert "Goodbye!" in captured.out

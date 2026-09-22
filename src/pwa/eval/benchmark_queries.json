@@ -2,301 +2,301 @@
   {
     "id": "q01",
     "category": "aggregation",
-    "question": "what is the average budget across all movies?",
+    "question": "what is the total sales revenue across all years?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q02",
     "category": "aggregation",
-    "question": "what is the total revenue of all movies combined?",
+    "question": "what is the average enterprise sales order value?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q03",
     "category": "aggregation",
-    "question": "what is the maximum movie runtime in minutes?",
+    "question": "what is the total number of products in the product catalog?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q04",
     "category": "aggregation",
-    "question": "what is the average vote rating across all movies?",
+    "question": "how many marketplace orders are in the platform?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q05",
     "category": "aggregation",
-    "question": "what is the total vote count for all movies?",
+    "question": "what is the total procurement spend across all suppliers?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q06",
     "category": "aggregation",
-    "question": "what is the minimum budget of any movie?",
+    "question": "what is the average marketplace review score?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q07",
     "category": "aggregation",
-    "question": "how many total movies are in the warehouse database?",
+    "question": "how many employees are in the database?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q08",
     "category": "aggregation",
-    "question": "what is the average revenue for movies directed by James Cameron?",
-    "expected_check": {"type": "answer_contains", "value": "Avatar"}
+    "question": "how many marketing leads are in the marketing funnel?",
+    "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q09",
     "category": "top_n",
-    "question": "which 3 movies had the highest revenue?",
-    "expected_check": {"type": "answer_contains", "value": "Avatar"}
+    "question": "which 5 product categories generated the most revenue?",
+    "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q10",
     "category": "top_n",
-    "question": "which 5 movies had the lowest revenue?",
+    "question": "show the top 10 suppliers by total purchase volume",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q11",
     "category": "top_n",
-    "question": "show the top 5 highest budget movies",
+    "question": "which 5 departments have the most employees?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q12",
     "category": "top_n",
-    "question": "which 10 movies have the highest vote ratings?",
+    "question": "which 3 marketplace sellers have the highest number of closed deals?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q13",
     "category": "top_n",
-    "question": "what are the 3 longest movies by runtime?",
+    "question": "show the 10 products with the highest list price",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q14",
     "category": "top_n",
-    "question": "which 5 directors have directed the most movies?",
+    "question": "which 5 states have the most marketplace customers?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q15",
     "category": "top_n",
-    "question": "which 3 movies generated the highest total profit?",
+    "question": "what are the top 5 payment methods used by marketplace customers?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q16",
     "category": "top_n",
-    "question": "show the 5 movies with the most vote counts",
+    "question": "show the 5 months with the highest marketplace order volume",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q17",
     "category": "filtering",
-    "question": "find all movies released after 2015 with budget over $50M",
-    "expected_check": {"type": "non_empty", "value": null}
+    "question": "list all products in the Bikes category",
+    "expected_check": {"type": "answer_contains", "value": "Bikes"}
   },
   {
     "id": "q18",
     "category": "filtering",
-    "question": "which movies were directed by Christopher Nolan?",
-    "expected_check": {"type": "answer_contains", "value": "Inception"}
+    "question": "find enterprise sales orders placed in 2014",
+    "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q19",
     "category": "filtering",
-    "question": "list Action movies with a vote average above 8.0",
+    "question": "list suppliers with a credit rating of 1",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q20",
     "category": "filtering",
-    "question": "movies released between 2000 and 2010 with revenue greater than $100M",
+    "question": "find marketplace orders with status canceled",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q21",
     "category": "filtering",
-    "question": "which movies star Leonardo DiCaprio?",
-    "expected_check": {"type": "answer_contains", "value": "Titanic"}
+    "question": "which employees have a salaried flag set to true?",
+    "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q22",
     "category": "filtering",
-    "question": "find movies with a runtime under 90 minutes and vote count over 100",
-    "expected_check": {"type": "non_empty", "value": null}
+    "question": "find marketplace customers from the state of SP",
+    "expected_check": {"type": "answer_contains", "value": "SP"}
   },
   {
     "id": "q23",
     "category": "filtering",
-    "question": "movies in the Sci-Fi genre with budget over $100M",
+    "question": "list marketing closed deals for sellers in the food segment",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q24",
     "category": "filtering",
-    "question": "list movies released in 2012 directed by Joss Whedon",
-    "expected_check": {"type": "answer_contains", "value": "Avengers"}
+    "question": "find products with a list price over 1000",
+    "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q25",
     "category": "group_by",
-    "question": "what is the average revenue by release year?",
+    "question": "what is the total sales revenue grouped by year?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q26",
     "category": "group_by",
-    "question": "show the number of movies released in each genre",
+    "question": "show total purchase spend grouped by supplier credit rating",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q27",
     "category": "group_by",
-    "question": "what is the total revenue generated by each director?",
+    "question": "count marketplace orders by order status",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q28",
     "category": "group_by",
-    "question": "calculate average budget for each release year after 2010",
+    "question": "average sales order value grouped by year",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q29",
     "category": "group_by",
-    "question": "what is the count of movies grouped by genre?",
+    "question": "count products by category",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q30",
     "category": "group_by",
-    "question": "show total revenue breakdown by director for top 5 directors",
+    "question": "total marketplace payments grouped by payment type",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q31",
     "category": "group_by",
-    "question": "average vote rating by genre",
+    "question": "employee count by department group",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q32",
     "category": "group_by",
-    "question": "movie count per release year for the last 10 years",
+    "question": "marketplace review score distribution (count per score 1-5)",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q33",
-    "category": "federated",
-    "question": "retrieve federated movie records from MySQL and Postgres sources",
+    "category": "cross_source",
+    "question": "show the seller_id link between marketing closed deals and marketplace sellers",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q34",
-    "category": "federated",
-    "question": "what are the top 5 movies in the federated MySQL table by revenue?",
+    "category": "cross_source",
+    "question": "what is the average declared monthly revenue for sellers in the closed_deals table?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q35",
-    "category": "federated",
-    "question": "compare budget and revenue from federated movie sources",
+    "category": "cross_source",
+    "question": "show sales order items joined with product category names",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q36",
-    "category": "federated",
-    "question": "find federated movies with budget greater than $100M",
+    "category": "cross_source",
+    "question": "find purchase orders for preferred suppliers",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q37",
-    "category": "federated",
-    "question": "list federated movies released in 2009",
-    "expected_check": {"type": "answer_contains", "value": "Avatar"}
+    "category": "cross_source",
+    "question": "join marketplace orders with customers to get customer state",
+    "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q38",
-    "category": "federated",
-    "question": "what is the average revenue in the federated movies view?",
+    "category": "cross_source",
+    "question": "list closed marketing deals and the corresponding seller city",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q39",
-    "category": "federated",
-    "question": "show 5 federated movies with the highest budget",
+    "category": "cross_source",
+    "question": "show order items with product names and seller information",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q40",
-    "category": "federated",
-    "question": "count total federated movie records in mart.v_federated_movies",
+    "category": "cross_source",
+    "question": "find marketplace orders delivered to customers with more than 2 total orders",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q41",
     "category": "date_time",
-    "question": "how many movies came out in 2019?",
+    "question": "how many marketplace orders were placed in 2017?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q42",
     "category": "date_time",
-    "question": "which movies were released in December 2015?",
+    "question": "show sales order counts by month for 2013",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q43",
     "category": "date_time",
-    "question": "show movies released in the 1990s",
+    "question": "what was the total sales revenue in Q1 2014?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q44",
     "category": "date_time",
-    "question": "what is the movie count by release year between 2005 and 2015?",
+    "question": "list marketplace orders placed between January 2017 and June 2017",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q45",
     "category": "ambiguous_edge",
-    "question": "tell me about the highest grossing film of all time",
-    "expected_check": {"type": "answer_contains", "value": "Avatar"}
+    "question": "tell me about the biggest enterprise customer by order value",
+    "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q46",
     "category": "ambiguous_edge",
-    "question": "who directed the movie about the giant blue aliens?",
-    "expected_check": {"type": "answer_contains", "value": "Cameron"}
+    "question": "which seller is closest to the most customers?",
+    "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q47",
     "category": "ambiguous_edge",
-    "question": "find movies starring Leonardo Di Caprio",
+    "question": "what is the most popular product in the marketplace?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q48",
     "category": "ambiguous_edge",
-    "question": "which movie had the biggest financial flop?",
+    "question": "which department had the biggest headcount growth?",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q49",
     "category": "ambiguous_edge",
-    "question": "movies with very high popularity rating",
+    "question": "show me the worst reviewed orders",
     "expected_check": {"type": "non_empty", "value": null}
   },
   {
     "id": "q50",
     "category": "ambiguous_edge",
-    "question": "what are the details for the movie Avatar?",
-    "expected_check": {"type": "answer_contains", "value": "2009"}
+    "question": "what was Nexora's market cap last quarter?",
+    "expected_check": {"type": "answer_contains", "value": "not available"}
   }
 ]

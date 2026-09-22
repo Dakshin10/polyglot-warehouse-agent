@@ -1,0 +1,204 @@
+# Canonical Enterprise Entities Configuration for Nexora Technologies
+# Maps business entities to physical BigQuery CURATED tables.
+
+entities:
+  dim_customer:
+    entity_name: "Customer"
+    description: "Enterprise customer master record across all channels"
+    dataset: "curated_enterprise"
+    physical_table: "curated_enterprise.dim_customer"
+    grain: "one row per canonical enterprise customer"
+    primary_key: ["enterprise_customer_id"]
+    source_systems: ["adventureworks", "olist"]
+    timestamp_column: "created_at"
+
+  dim_product:
+    entity_name: "Product"
+    description: "Enterprise product catalog with hierarchy and pricing"
+    dataset: "curated_enterprise"
+    physical_table: "curated_enterprise.dim_product"
+    grain: "one row per product SKU"
+    primary_key: ["enterprise_product_id"]
+    source_systems: ["adventureworks", "olist"]
+    timestamp_column: "created_at"
+
+  fact_sales_order:
+    entity_name: "Sales Order"
+    description: "Sales order transaction headers"
+    dataset: "curated_enterprise"
+    physical_table: "curated_enterprise.fact_sales_order"
+    grain: "one row per sales order header"
+    primary_key: ["sales_order_id"]
+    source_systems: ["adventureworks", "olist"]
+    timestamp_column: "order_date"
+
+  fact_sales_order_item:
+    entity_name: "Sales Order Line Item"
+    description: "Sales order line item detail transactions"
+    dataset: "curated_enterprise"
+    physical_table: "curated_enterprise.fact_sales_order_item"
+    grain: "one row per sales order line item"
+    primary_key: ["sales_order_item_id"]
+    source_systems: ["adventureworks", "olist"]
+    timestamp_column: "order_date"
+
+  dim_supplier:
+    entity_name: "Supplier"
+    description: "Vendor and supplier master records"
+    dataset: "curated_enterprise"
+    physical_table: "curated_enterprise.dim_supplier"
+    grain: "one row per vendor/supplier"
+    primary_key: ["vendor_id"]
+    source_systems: ["adventureworks", "olist"]
+    timestamp_column: "created_at"
+
+  fact_purchase_order:
+    entity_name: "Purchase Order"
+    description: "Procurement purchase order headers"
+    dataset: "curated_enterprise"
+    physical_table: "curated_enterprise.fact_purchase_order"
+    grain: "one row per purchase order header"
+    primary_key: ["purchase_order_id"]
+    source_systems: ["adventureworks"]
+    timestamp_column: "order_date"
+
+  fact_purchase_order_item:
+    entity_name: "Purchase Order Line Item"
+    description: "Procurement purchase order detail line items"
+    dataset: "curated_enterprise"
+    physical_table: "curated_enterprise.fact_purchase_order_item"
+    grain: "one row per purchase order line item"
+    primary_key: ["purchase_order_item_id"]
+    source_systems: ["adventureworks"]
+    timestamp_column: "order_date"
+
+  dim_employee:
+    entity_name: "Employee"
+    description: "Enterprise employee and HR directory"
+    dataset: "curated_enterprise"
+    physical_table: "curated_enterprise.dim_employee"
+    grain: "one row per enterprise employee"
+    primary_key: ["employee_id"]
+    source_systems: ["adventureworks"]
+    timestamp_column: "hire_date"
+
+  dim_lead:
+    entity_name: "Marketing Lead"
+    description: "Marketing qualified leads"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.dim_lead"
+    grain: "one row per marketing qualified lead"
+    primary_key: ["mql_id"]
+    source_systems: ["olist_marketing"]
+    timestamp_column: "first_contact_date"
+
+  fact_lead_event:
+    entity_name: "Marketing Lead Activity Event"
+    description: "Historical lead conversion and activity events"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.fact_lead_event"
+    grain: "one row per lead activity event"
+    primary_key: ["event_id"]
+    source_systems: ["olist_marketing"]
+    timestamp_column: "won_date"
+
+  fact_inventory:
+    entity_name: "Warehouse Inventory Stock"
+    description: "Inventory stock balances per warehouse and product"
+    dataset: "curated_enterprise"
+    physical_table: "curated_enterprise.fact_inventory"
+    grain: "one row per warehouse and product inventory snapshot"
+    primary_key: ["inventory_id"]
+    source_systems: ["adventureworks"]
+    timestamp_column: "updated_at"
+
+  dim_marketplace_customer:
+    entity_name: "Marketplace Customer"
+    description: "External marketplace customer master"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.dim_marketplace_customer"
+    grain: "one row per marketplace customer"
+    primary_key: ["source_customer_id"]
+    source_systems: ["olist"]
+    timestamp_column: "created_at"
+
+  dim_marketplace_seller:
+    entity_name: "Marketplace Seller"
+    description: "External marketplace seller master"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.dim_marketplace_seller"
+    grain: "one row per marketplace seller"
+    primary_key: ["source_seller_id"]
+    source_systems: ["olist"]
+    timestamp_column: "created_at"
+
+  dim_marketplace_product:
+    entity_name: "Marketplace Product"
+    description: "External marketplace product catalog"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.dim_marketplace_product"
+    grain: "one row per marketplace product"
+    primary_key: ["source_product_id"]
+    source_systems: ["olist"]
+    timestamp_column: "created_at"
+
+  fact_marketplace_order:
+    entity_name: "Marketplace Order"
+    description: "External marketplace order transaction headers"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.fact_marketplace_order"
+    grain: "one row per marketplace order header"
+    primary_key: ["source_order_id"]
+    source_systems: ["olist"]
+    timestamp_column: "order_purchase_timestamp"
+
+  fact_marketplace_order_item:
+    entity_name: "Marketplace Order Line Item"
+    description: "External marketplace order line item detail"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.fact_marketplace_order_item"
+    grain: "one row per marketplace order line item"
+    primary_key: ["order_item_sk"]
+    source_systems: ["olist"]
+    timestamp_column: "shipping_limit_date"
+
+  fact_marketplace_payment:
+    entity_name: "Marketplace Payment"
+    description: "External marketplace order payment transactions"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.fact_marketplace_payment"
+    grain: "one row per marketplace order payment"
+    primary_key: ["source_order_id"]
+    source_systems: ["olist"]
+    timestamp_column: "created_at"
+
+  fact_marketplace_review:
+    entity_name: "Marketplace Customer Review"
+    description: "External marketplace customer reviews"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.fact_marketplace_review"
+    grain: "one row per customer review"
+    primary_key: ["source_review_id"]
+    source_systems: ["olist"]
+    timestamp_column: "review_date"
+
+  fact_marketing_lead:
+    entity_name: "Marketing Qualified Lead"
+    description: "Marketing qualified lead records"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.fact_marketing_lead"
+    grain: "one row per MQL"
+    primary_key: ["source_mql_id"]
+    source_systems: ["olist_marketing"]
+    timestamp_column: "first_contact_date"
+
+  fact_closed_deal:
+    entity_name: "Closed Marketing Deal"
+    description: "Closed deals connecting leads to marketplace sellers"
+    dataset: "curated_marketplace"
+    physical_table: "curated_marketplace.fact_closed_deal"
+    grain: "one row per closed deal"
+    primary_key: ["source_mql_id"]
+    source_systems: ["olist_marketing"]
+    timestamp_column: "won_date"
+

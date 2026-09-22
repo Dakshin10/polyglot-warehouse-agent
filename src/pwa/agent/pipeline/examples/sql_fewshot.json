@@ -1,62 +1,62 @@
 [
   {
-    "question": "Which movie had the highest revenue?",
-    "sql": "SELECT title, revenue_usd FROM `salitsteel-502008.mart.v_movie` ORDER BY revenue_usd DESC LIMIT 1"
+    "question": "What was the total sales revenue by year?",
+    "sql": "SELECT order_year, order_count, total_sales_usd FROM `{PROJECT}.rollup.sales_by_year` ORDER BY order_year"
   },
   {
-    "question": "List the top 5 movies by profit.",
-    "sql": "SELECT title, profit_usd, ROUND(roi, 2) AS roi FROM `salitsteel-502008.mart.v_movie` WHERE profit_usd IS NOT NULL ORDER BY profit_usd DESC LIMIT 5"
+    "question": "Which product category generated the most revenue?",
+    "sql": "SELECT category_name, SUM(total_revenue_usd) AS total_revenue FROM `{PROJECT}.rollup.product_sales_by_category` GROUP BY category_name ORDER BY total_revenue DESC LIMIT 1"
   },
   {
-    "question": "What is the average vote rating across all movies?",
-    "sql": "SELECT ROUND(AVG(vote_average), 2) AS avg_rating, COUNT(*) AS total_movies FROM `salitsteel-502008.mart.v_movie`"
+    "question": "Who are the top 5 suppliers by total purchase volume?",
+    "sql": "SELECT supplier_name, total_purchased_usd, order_count FROM `{PROJECT}.rollup.supplier_purchase_volume` ORDER BY total_purchased_usd DESC LIMIT 5"
   },
   {
-    "question": "How many movies are in each genre?",
-    "sql": "SELECT primary_genre, COUNT(*) AS movie_count FROM `salitsteel-502008.mart.v_movie` WHERE primary_genre IS NOT NULL GROUP BY primary_genre ORDER BY movie_count DESC LIMIT 20"
+    "question": "Show monthly marketplace order volume for 2018.",
+    "sql": "SELECT year_month, order_count, delivered_count, canceled_count FROM `{PROJECT}.rollup.marketplace_order_volume_by_month` WHERE order_year = 2018 ORDER BY order_month"
   },
   {
-    "question": "Which genre earned the most total revenue?",
-    "sql": "SELECT primary_genre, SUM(revenue_usd) AS total_revenue FROM `salitsteel-502008.mart.v_movie` WHERE primary_genre IS NOT NULL GROUP BY primary_genre ORDER BY total_revenue DESC LIMIT 1"
+    "question": "What is the total number of marketplace orders?",
+    "sql": "SELECT COUNT(*) AS total_orders FROM `{PROJECT}.curated_marketplace.fact_marketplace_order`"
   },
   {
-    "question": "Who directed the most movies?",
-    "sql": "SELECT director_name, COUNT(*) AS movie_count FROM `salitsteel-502008.mart.v_movie_credits` WHERE director_name IS NOT NULL GROUP BY director_name ORDER BY movie_count DESC LIMIT 5"
+    "question": "What is the average order value for enterprise sales?",
+    "sql": "SELECT ROUND(AVG(total_due_amount), 2) AS avg_order_value_usd FROM `{PROJECT}.curated_enterprise.fact_sales_order`"
   },
   {
-    "question": "Which director has the highest average ROI across their movies?",
-    "sql": "SELECT c.director_name, ROUND(AVG(m.roi), 2) AS avg_roi, COUNT(*) AS num_movies FROM `salitsteel-502008.mart.v_movie` m JOIN `salitsteel-502008.mart.v_movie_credits` c ON m.movie_id = c.movie_id WHERE c.director_name IS NOT NULL AND m.roi IS NOT NULL GROUP BY c.director_name HAVING COUNT(*) >= 3 ORDER BY avg_roi DESC LIMIT 10"
+    "question": "List the top 10 products by units sold.",
+    "sql": "SELECT p.product_name, p.category_name, SUM(soi.quantity) AS units_sold FROM `{PROJECT}.curated_enterprise.fact_sales_order_item` soi JOIN `{PROJECT}.curated_enterprise.dim_product` p ON soi.product_sk = p.product_sk GROUP BY p.product_name, p.category_name ORDER BY units_sold DESC LIMIT 10"
   },
   {
-    "question": "What are the top 5 movies by revenue in the Action genre?",
-    "sql": "SELECT title, revenue_usd, release_year FROM `salitsteel-502008.mart.v_movie` WHERE primary_genre = 'Action' ORDER BY revenue_usd DESC LIMIT 5"
+    "question": "How many employees are in each department?",
+    "sql": "SELECT d.department_name, d.department_group, COUNT(DISTINCT e.employee_sk) AS employee_count FROM `{PROJECT}.curated_enterprise.dim_employee` e JOIN `{PROJECT}.raw_adventureworks.employee_department_history` edh ON e.source_employee_id = CAST(edh.BusinessEntityID AS STRING) JOIN `{PROJECT}.curated_enterprise.dim_department` d ON CAST(edh.DepartmentID AS STRING) = d.source_department_id GROUP BY d.department_name, d.department_group ORDER BY employee_count DESC"
   },
   {
-    "question": "Which movies were released in 2010 and had a rating above 7.5?",
-    "sql": "SELECT title, vote_average, revenue_usd FROM `salitsteel-502008.mart.v_movie` WHERE release_year = 2010 AND vote_average > 7.5 ORDER BY vote_average DESC LIMIT 20"
+    "question": "What is the total purchase amount by supplier credit rating?",
+    "sql": "SELECT credit_rating, COUNT(*) AS supplier_count, SUM(total_purchased_usd) AS total_purchased FROM `{PROJECT}.rollup.supplier_purchase_volume` GROUP BY credit_rating ORDER BY total_purchased DESC"
   },
   {
-    "question": "What keywords are associated with the movie Inception?",
-    "sql": "SELECT k.keyword FROM `salitsteel-502008.mart.v_movie_keywords` k JOIN `salitsteel-502008.mart.v_movie` m ON k.movie_id = m.movie_id WHERE LOWER(m.title) = 'inception' ORDER BY k.keyword LIMIT 30"
+    "question": "Which marketplace sellers have the most closed marketing deals?",
+    "sql": "SELECT seller_city, seller_state, business_segment, SUM(closed_deal_count) AS total_deals FROM `{PROJECT}.rollup.marketing_leads_by_seller` GROUP BY seller_city, seller_state, business_segment ORDER BY total_deals DESC LIMIT 10"
   },
   {
-    "question": "Which movies have the most keywords?",
-    "sql": "SELECT m.title, COUNT(k.keyword_id) AS keyword_count FROM `salitsteel-502008.mart.v_movie` m JOIN `salitsteel-502008.mart.v_movie_keywords` k ON m.movie_id = k.movie_id GROUP BY m.title ORDER BY keyword_count DESC LIMIT 10"
+    "question": "What payment methods do marketplace customers use most?",
+    "sql": "SELECT payment_type, SUM(order_count) AS orders, ROUND(SUM(total_payment_usd), 2) AS total_paid FROM `{PROJECT}.rollup.payment_totals_by_year` GROUP BY payment_type ORDER BY total_paid DESC"
   },
   {
-    "question": "Show full details for the top 3 movies by revenue including director and lead actor.",
-    "sql": "SELECT m.title, m.release_year, m.revenue_usd, m.primary_genre, c.director_name, c.lead_actor_name FROM `salitsteel-502008.mart.v_movie_full` m JOIN `salitsteel-502008.mart.v_movie_credits` c ON m.movie_id = c.movie_id ORDER BY m.revenue_usd DESC LIMIT 3"
+    "question": "Show all products in the Bikes category.",
+    "sql": "SELECT product_name, subcategory_name, list_price, standard_cost FROM `{PROJECT}.curated_enterprise.dim_product` WHERE LOWER(category_name) = 'bikes' ORDER BY list_price DESC LIMIT 20"
   },
   {
-    "question": "What is the average cast size by genre?",
-    "sql": "SELECT m.primary_genre, ROUND(AVG(c.cast_size), 1) AS avg_cast_size FROM `salitsteel-502008.mart.v_movie` m JOIN `salitsteel-502008.mart.v_movie_credits` c ON m.movie_id = c.movie_id WHERE m.primary_genre IS NOT NULL GROUP BY m.primary_genre ORDER BY avg_cast_size DESC LIMIT 15"
+    "question": "What is the average review score for marketplace orders?",
+    "sql": "SELECT ROUND(AVG(review_score), 2) AS avg_review_score, COUNT(*) AS total_reviews FROM `{PROJECT}.curated_marketplace.fact_marketplace_review`"
   },
   {
-    "question": "How many data quality exceptions exist in the mart?",
-    "sql": "SELECT COUNT(*) AS exception_count FROM `salitsteel-502008.mart.v_integrity_exceptions`"
+    "question": "How many data integrity exceptions exist across the platform?",
+    "sql": "SELECT * FROM `{PROJECT}.curated_enterprise.v_integrity_summary`"
   },
   {
-    "question": "Get live director credits directly from the Cloud SQL PostgreSQL database.",
-    "sql": "SELECT * FROM EXTERNAL_QUERY('salitsteel-502008.EU.movie-credits-conn', 'SELECT director_name, COUNT(*) AS cnt FROM movie_credits GROUP BY director_name ORDER BY cnt DESC LIMIT 10')"
+    "question": "Show marketplace customers with more than 3 orders.",
+    "sql": "SELECT customer_unique_id, state, order_count FROM `{PROJECT}.rollup.customer_order_frequency` WHERE order_count > 3 ORDER BY order_count DESC LIMIT 20"
   }
 ]

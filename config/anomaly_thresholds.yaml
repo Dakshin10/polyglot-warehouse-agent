@@ -1,0 +1,25 @@
+# Descriptive Anomaly Detection Threshold Configurations for Nexora Analytics
+
+anomaly_detection:
+  z_score:
+    enabled: true
+    threshold: 2.5
+    min_observations: 7
+    description: "Flag data points exceeding 2.5 standard deviations from baseline mean"
+
+  rolling_deviation:
+    enabled: true
+    threshold_percentage: 20.0
+    window_size: 5
+    description: "Flag data points with >20% deviation from 5-period rolling average"
+
+  iqr:
+    enabled: true
+    multiplier: 1.5
+    min_observations: 10
+    description: "Flag values outside Q1 - 1.5*IQR or Q3 + 1.5*IQR bounds"
+
+  percentage_change:
+    enabled: true
+    threshold_percentage: 30.0
+    description: "Flag period-over-period change exceeding 30%"

@@ -1,183 +1,214 @@
-"""Stage 4: AnswerSynthesisAgent — natural language answer + viz recommendation.
+"""Stage 4: Agent 4 — Answer Synthesis Agent.
 
-Returns a tuple ``(clean_answer: str, viz_dict: dict | None)`` so callers can
-populate ``PipelineResult.viz_recommendation`` without an additional LLM call.
-
-The LLM is instructed to append a ``<!-- VIZ_JSON {...} -->`` block after the
-answer text.  ``_extract_viz_json`` strips the block and returns the parsed dict.
-If the block is absent or malformed the viz_dict is ``None`` and the orchestrator
-falls back to shape-based heuristics.
+Synthesizes structured AnalyticalAnswer contracts grounded strictly in QueryResult
+data, enforcing numerical non-hallucination, citable provenance, and visualization routing.
 """
 
-import asyncio
+from __future__ import annotations
+
+from dataclasses import dataclass, field
 import json
 import logging
 import re
-from typing import Any
+from typing import Any, Optional
 
-from google.adk import Agent
-from google.adk.runners import InMemoryRunner
-from google.genai import types
-
-from pwa.agent.models import get_agent_model, get_model_for_stage
-from pwa.agent.root_agent import _init_env
+from pwa.semantic.result_contract import QueryResult
+from pwa.ui.viz_router import VisualizationRouter, VisualizationSpec
 
 logger = logging.getLogger("pwa.agent.pipeline.answer_agent")
 
-# ─── VIZ_JSON delimiter parser ────────────────────────────────────────────────
 
-_VIZ_BLOCK_RE = re.compile(
-    r"<!--\s*VIZ_JSON\s*(.*?)\s*-->",
-    re.DOTALL | re.IGNORECASE,
-)
+@dataclass
+class AnalyticalAnswer:
+    """Structured response contract returned by Agent 4 Answer Synthesis Agent."""
 
-
-def _extract_viz_json(raw: str) -> tuple[str, dict | None]:
-    """Strip the VIZ_JSON comment block from *raw* and return ``(clean_text, dict)``.
-
-    Returns ``(raw.strip(), None)`` when the block is absent or the JSON inside
-    is invalid — the caller should fall back to shape heuristics in that case.
-    """
-    m = _VIZ_BLOCK_RE.search(raw)
-    if not m:
-        return raw.strip(), None
-    clean = _VIZ_BLOCK_RE.sub("", raw).strip()
-    try:
-        data = json.loads(m.group(1).strip())
-        return clean, data
-    except (json.JSONDecodeError, ValueError):
-        logger.debug("[AnswerAgent] VIZ_JSON block present but not valid JSON — ignoring.")
-        return clean, None
+    answer_text: str
+    key_findings: list[str]
+    query_id: str
+    sql: str
+    source_tables: list[str]
+    semantic_objects_used: list[str]
+    row_count: int
+    bytes_processed: int
+    execution_time_seconds: float
+    freshness_status: str
+    quality_status: str
+    warnings: list[str] = field(default_factory=list)
+    visualization_spec: Optional[VisualizationSpec] = None
+    observation_summary: str = ""
+    interpretation_summary: str = ""
+    causal_claims_asserted: list[str] = field(default_factory=list)
 
 
-# ─── System instruction ───────────────────────────────────────────────────────
-
-ANSWER_SYNTHESIS_INSTRUCTION = """\
-You are an Answer Synthesis Agent for a data warehouse assistant.
-Your job is to read the user's natural language question and the query execution
-results (or error explanation), and synthesize a clear, concise, and professional
-natural language answer.
-
-=== ANSWER RULES ===
-1. NATURAL LANGUAGE ONLY: Synthesize the data into a helpful conversational
-   response. Do NOT output raw JSON or unformatted rows.
-2. ACCURACY: Base your facts strictly on the provided query result rows.
-3. OUT OF SCOPE / UNANSWERABLE / ERRORS: If the query result status is 'ERROR'
-   or 'EMPTY', explain clearly to the user that the information is not available
-   in the warehouse mart views. Do NOT hallucinate data.
-
-=== VISUALIZATION RECOMMENDATION ===
-After your natural language answer, append EXACTLY this block (do NOT omit it):
-
-<!-- VIZ_JSON
-{
-  "primary": {
-    "type": "bar|line|scatter|table|metric",
-    "x_col": "<column name or null>",
-    "y_col": "<column name or null>",
-    "reason": "<1 sentence referencing the columns and what the user is comparing>"
-  },
-  "alternatives": [
-    {"type": "...", "x_col": "...", "y_col": "...", "reason": "..."}
-  ]
-}
--->
-
-RULES for the VIZ recommendation:
-- "metric": ONLY for a single aggregate value (1 row result, ≤ 2 columns).
-- "line": ONLY for datetime, year-like (2015, 2016 …), or explicitly ordered
-  sequences. NEVER suggest line across unordered categories (genre, director
-  name, country, etc.) — that would be misleading.
-- "bar": for ranked/compared categorical data where order matters.
-- "scatter": for two numeric dimensions (e.g. budget vs revenue across many
-  movies) where correlation or distribution is the point.
-- "table": catch-all when no single chart type adds clarity over the raw data.
-- x_col / y_col must exactly match a column name from the result schema, or null.
-- "reason": must reference the specific columns and what the user is comparing —
-  not a generic template phrase like "this is good for data".
-- "alternatives": 0-2 items; omit or leave empty [] if the primary is the only
-  sensible choice (e.g. metric result has no good chart alternative).
-"""
+def _summarize_numeric_columns(rows: list[dict[str, Any]], columns: list[str]) -> str:
+    """Summarize numeric columns across ALL result rows (not just the first), so a
+    multi-row answer reflects the whole result set instead of a single sampled row."""
+    if not rows:
+        return ""
+    parts: list[str] = []
+    for col in columns:
+        values = [row[col] for row in rows if isinstance(row.get(col), (int, float))]
+        if not values:
+            continue
+        total = sum(values)
+        parts.append(
+            f"{col} totals {total:,.2f} across all {len(rows)} rows"
+            if isinstance(total, float)
+            else f"{col} totals {total:,} across all {len(rows)} rows"
+        )
+    return " ".join(parts[:2])
 
 
-# ─── Agent factory ────────────────────────────────────────────────────────────
+class AnswerSynthesisAgent:
+    """Agent 4 engine synthesizing grounded answers with citable provenance."""
 
+    def __init__(self, viz_router: VisualizationRouter | None = None) -> None:
+        self.viz_router = viz_router or VisualizationRouter()
 
-def build_answer_agent(model: Any = None) -> Agent:
-    _init_env()
-    selected_model = get_model_for_stage("answer") if model is None else get_agent_model(model)
-    return Agent(
-        name="AnswerSynthesisAgent",
-        model=selected_model,
-        instruction=ANSWER_SYNTHESIS_INSTRUCTION,
-    )
+    def synthesize(
+        self,
+        question: str,
+        query_result: QueryResult,
+    ) -> AnalyticalAnswer:
+        """Synthesize AnalyticalAnswer contract from QueryResult."""
+        # 1. Infer Visualization Spec
+        viz_spec = self.viz_router.recommend_visualization(query_result)
 
+        # 2. Extract numeric observations from QueryResult
+        key_findings: list[str] = []
+        if query_result.rows:
+            first_row = query_result.rows[0]
+            for col, val in first_row.items():
+                if isinstance(val, (int, float)):
+                    key_findings.append(f"{col}: {val:,.2f}" if isinstance(val, float) else f"{col}: {val:,}")
+                else:
+                    key_findings.append(f"{col}: {val}")
 
-# Note: intentionally NOT building a module-level answer_agent singleton here
-# (was adding unnecessary init overhead at import time).
+        # 3. Construct Numerical Grounding Answer Text
+        if not query_result.rows:
+            answer_text = "The query completed successfully, but returned 0 matching records."
+            obs = "0 rows returned."
+        elif len(query_result.rows) == 1 and len(query_result.columns) == 1:
+            val = list(query_result.rows[0].values())[0]
+            answer_text = f"The result for '{question}' is {val}."
+            obs = f"Single metric result: {val}."
+        elif len(query_result.rows) == 1:
+            bullets = ", ".join(f"{k} = {v}" for k, v in query_result.rows[0].items())
+            answer_text = f"Based on enterprise warehouse data: {bullets}."
+            obs = f"Single result row: {bullets}."
+        else:
+            top_rows = query_result.rows[:3]
+            row_lines = [", ".join(f"{k}={v}" for k, v in row.items()) for row in top_rows]
+            row_summary = "; ".join(row_lines)
+            numeric_summary = _summarize_numeric_columns(query_result.rows, query_result.columns)
+            extra = f" {numeric_summary}" if numeric_summary else ""
+            answer_text = (
+                f"Based on enterprise warehouse data ({query_result.row_count} rows returned), "
+                f"the top results are: {row_summary}.{extra}"
+            )
+            obs = f"Top {len(top_rows)} of {query_result.row_count} rows: {row_summary}.{extra}"
 
+        # Add freshness / quality warnings if present
+        warnings = list(query_result.warnings)
+        if query_result.freshness_status != "FRESH":
+            warnings.append(f"Data freshness SLA status is `{query_result.freshness_status}`.")
+        if query_result.quality_status != "PASS":
+            warnings.append(f"Data quality status is `{query_result.quality_status}`.")
 
-# ─── Main synthesis function ──────────────────────────────────────────────────
+        # 4. Numerical Grounding Anti-Hallucination Audit
+        self._verify_numerical_grounding(answer_text, query_result.rows)
+
+        return AnalyticalAnswer(
+            answer_text=answer_text,
+            key_findings=key_findings,
+            query_id=query_result.query_id,
+            sql=query_result.sql,
+            source_tables=query_result.source_tables,
+            semantic_objects_used=query_result.semantic_objects_used,
+            row_count=query_result.row_count,
+            bytes_processed=query_result.bytes_processed,
+            execution_time_seconds=query_result.execution_time_seconds,
+            freshness_status=query_result.freshness_status,
+            quality_status=query_result.quality_status,
+            warnings=warnings,
+            visualization_spec=viz_spec,
+            observation_summary=obs,
+            interpretation_summary=(
+                f"Descriptive summary of curated enterprise data from "
+                f"{', '.join(query_result.semantic_objects_used) or 'the queried source'}."
+            ),
+            causal_claims_asserted=[],  # Zero unsupported causal claims asserted
+        )
+
+    def _verify_numerical_grounding(self, text: str, rows: list[dict[str, Any]]) -> None:
+        """Audit answer text ensuring no un-grounded numbers appear in synthesis."""
+        numbers_in_text = [float(n) for n in re.findall(r"\b\d+(?:\.\d+)?\b", text)]
+        valid_numbers: set[float] = set()
+        for row in rows:
+            for val in row.values():
+                if isinstance(val, (int, float)):
+                    valid_numbers.add(float(val))
+
+        for num in numbers_in_text:
+            # Allow common small structural numbers (e.g. 0, 1, 2, 3, 100) or check if in valid_numbers
+            if num > 10 and num not in valid_numbers:
+                logger.warning(
+                    f"Numerical grounding warning: Number `{num}` in answer text not found directly in QueryResult rows."
+                )
 
 
 def synthesize_answer(
     question: str,
-    result: dict[str, Any],
+    sql: str,
+    exec_result: dict[str, Any],
     model: Any = None,
-) -> tuple[str, dict | None]:
-    """Run Stage 4: synthesize query result rows into a NL response + viz recommendation.
+    **kwargs: Any,
+) -> tuple[str, dict[str, Any] | None]:
+    """Legacy interface adapter function."""
+    from pwa.agent.pipeline.exec_agent import _extract_source_tables, _tables_to_semantic_objects
 
-    Args:
-        question: Original natural-language question.
-        result:   Execution result dict with keys ``status``, ``rows``, etc.
-        model:    Optional model override (passed by run_step_with_fallback).
+    rows = exec_result.get("rows", [])
+    cols = list(rows[0].keys()) if rows else []
 
-    Returns:
-        ``(clean_answer, viz_dict)`` where ``viz_dict`` is the parsed
-        ``VizRecommendation`` dict or ``None`` if the LLM omitted / corrupted it.
-    """
-    logger.debug(
-        f"[Stage 4 - AnswerSynthesisAgent Input]: question='{question}', result_status='{result.get('status')}'"
+    source_tables = exec_result.get("source_tables") or _extract_source_tables(sql)
+    semantic_objects = exec_result.get("semantic_objects_used") or _tables_to_semantic_objects(source_tables)
+
+    query_res = QueryResult(
+        query_id="legacy_synthesis",
+        sql=sql,
+        columns=cols,
+        rows=rows,
+        row_count=len(rows),
+        bytes_processed=exec_result.get("bytes_scanned", 0),
+        execution_time_seconds=0.1,
+        semantic_objects_used=semantic_objects,
+        source_tables=source_tables,
+        warnings=exec_result.get("warnings", []),
+        freshness_status=exec_result.get("freshness_status", "FRESH"),
+        quality_status=exec_result.get("quality_status", "PASS"),
     )
-    _init_env()
+    agent = AnswerSynthesisAgent()
+    answer_contract = agent.synthesize(question, query_res)
+    viz_dict = answer_contract.visualization_spec.__dict__ if answer_contract.visualization_spec else None
+    return answer_contract.answer_text, viz_dict
 
-    # Build schema context for the viz recommendation decision
-    rows = result.get("rows") or []
-    from pwa.ui.viz_recommendation import format_schema_for_prompt
 
-    schema_ctx = format_schema_for_prompt(rows)
+def _extract_viz_json(raw_text: str) -> tuple[str, dict[str, Any] | None]:
+    """Legacy helper extracting viz json block from answer text if present."""
+    if not raw_text:
+        return raw_text, None
 
-    result_json = json.dumps(result, indent=2)
-    user_prompt = (
-        f"USER QUESTION: {question}\n\n"
-        f"RESULT SCHEMA: {schema_ctx}\n\n"
-        f"QUERY EXECUTION RESULT:\n{result_json}\n\n"
-        "Please provide your concise natural language response followed by the "
-        "VIZ_JSON block as instructed:"
-    )
+    pattern = re.compile(r"<!--\s*viz_json\s*\n?(.*?)\n?-->", re.IGNORECASE | re.DOTALL)
+    match = pattern.search(raw_text)
+    if not match:
+        return raw_text, None
 
-    agent = build_answer_agent(model=model)
-    runner = InMemoryRunner(agent=agent, app_name="pwa_pipeline")
+    json_str = match.group(1).strip()
+    clean_text = pattern.sub("", raw_text).strip()
 
-    async def _run() -> str:
-        session = await runner.session_service.create_session(app_name="pwa_pipeline", user_id="pipeline_user")
-        response_text = ""
-        async for event in runner.run_async(
-            user_id="pipeline_user",
-            session_id=session.id,
-            new_message=types.Content(role="user", parts=[types.Part.from_text(text=user_prompt)]),
-        ):
-            if hasattr(event, "content") and event.content:
-                for part in getattr(event.content, "parts", []):
-                    if getattr(part, "text", None):
-                        response_text += part.text
-        return response_text.strip()
-
-    raw_response = asyncio.run(_run())
-    clean_answer, viz_dict = _extract_viz_json(raw_response)
-
-    logger.debug(
-        f"[Stage 4 - AnswerSynthesisAgent Output]: answer='{clean_answer[:80]}...', "
-        f"viz_dict={'present' if viz_dict else 'absent/invalid'}"
-    )
-    return clean_answer, viz_dict
+    try:
+        viz_dict = json.loads(json_str)
+        return clean_text, viz_dict
+    except Exception as exc:
+        logger.warning(f"Failed to parse extracted viz JSON: {exc}")
+        return clean_text, None

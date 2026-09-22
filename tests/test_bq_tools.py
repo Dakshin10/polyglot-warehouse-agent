@@ -42,13 +42,12 @@ def test_allowlist_validation_accepts_valid_mart_views():
 def test_allowlist_validation_rejects_non_mart_tables():
     """Requirement 3 & 6: Verify allowlist validation rejects non-mart tables and invalid inputs."""
     invalid_tables = [
-        "raw_registry.movie",
-        "raw_credits.movie_credits",
-        "raw_files.movie_keywords",
-        "staging_movies",
+        "raw_adventureworks.orders",
+        "raw_olist.orders",
+        "staging_enterprise",
         "mart.v_unknown_view",
-        "public.movie",
-        "select * from mart.v_movie",
+        "public.orders",
+        "select * from mart.v_sales_order_line",
     ]
     for invalid in invalid_tables:
         with pytest.raises(ValueError, match="Access denied"):
@@ -64,10 +63,17 @@ def test_schema_snapshot_with_mocked_client():
     mock_query_job = MagicMock()
 
     # Create mock rows representing INFORMATION_SCHEMA results
-    Row1 = MagicMock(table_name="v_movie", column_name="movie_id", data_type="INTEGER", description="Unique movie ID")
-    Row2 = MagicMock(table_name="v_movie", column_name="title", data_type="STRING", description="Movie title")
+    Row1 = MagicMock(
+        table_name="v_sales_order_line",
+        column_name="sales_order_id",
+        data_type="INTEGER",
+        description="Unique order ID",
+    )
+    Row2 = MagicMock(
+        table_name="v_sales_order_line", column_name="line_total_usd", data_type="FLOAT", description="Line item total"
+    )
     Row3 = MagicMock(
-        table_name="v_movie_credits", column_name="director_name", data_type="STRING", description="Director name"
+        table_name="v_product_catalog", column_name="product_name", data_type="STRING", description="Product name"
     )
 
     mock_query_job.result.return_value = [Row1, Row2, Row3]
@@ -79,22 +85,22 @@ def test_schema_snapshot_with_mocked_client():
     assert mock_client.query.called
     query_str = mock_client.query.call_args[0][0]
     assert "INFORMATION_SCHEMA.COLUMNS" in query_str
-    assert "v_movie" in query_str
+    assert "v_sales_order_line" in query_str
 
     # Verify snapshot contents
-    assert "mart.v_movie" in snapshot
-    assert "mart.v_movie_credits" in snapshot
-    assert "mart.v_movie_keywords" in snapshot
+    assert "mart.v_sales_order_line" in snapshot
+    assert "mart.v_product_catalog" in snapshot
+    assert "mart.v_customer_360" in snapshot
 
     # Verify column fields
-    v_movie_cols = snapshot["mart.v_movie"]
-    assert len(v_movie_cols) == 2
-    assert v_movie_cols[0] == {"name": "movie_id", "type": "INTEGER", "description": "Unique movie ID"}
-    assert v_movie_cols[1] == {"name": "title", "type": "STRING", "description": "Movie title"}
+    v_sales_cols = snapshot["mart.v_sales_order_line"]
+    assert len(v_sales_cols) == 2
+    assert v_sales_cols[0] == {"name": "sales_order_id", "type": "INTEGER", "description": "Unique order ID"}
+    assert v_sales_cols[1] == {"name": "line_total_usd", "type": "FLOAT", "description": "Line item total"}
 
-    v_credits_cols = snapshot["mart.v_movie_credits"]
-    assert len(v_credits_cols) == 1
-    assert v_credits_cols[0] == {"name": "director_name", "type": "STRING", "description": "Director name"}
+    v_prod_cols = snapshot["mart.v_product_catalog"]
+    assert len(v_prod_cols) == 1
+    assert v_prod_cols[0] == {"name": "product_name", "type": "STRING", "description": "Product name"}
 
 
 def test_credentials_config():

@@ -1,0 +1,73 @@
+# Governed Join Graph Relationships Configuration for Nexora Technologies
+
+relationships:
+  customer_to_sales_order:
+    name: "customer_to_sales_order"
+    source_entity: "dim_customer"
+    target_entity: "fact_sales_order"
+    join_type: "LEFT"
+    cardinality: "ONE_TO_MANY"
+    source_key: "enterprise_customer_id"
+    target_key: "customer_id"
+    description: "Links customer master records to their sales order transaction headers"
+
+  sales_order_to_item:
+    name: "sales_order_to_item"
+    source_entity: "fact_sales_order"
+    target_entity: "fact_sales_order_item"
+    join_type: "INNER"
+    cardinality: "ONE_TO_MANY"
+    source_key: "sales_order_id"
+    target_key: "sales_order_id"
+    description: "Links sales order headers to detail line items"
+
+  product_to_sales_order_item:
+    name: "product_to_sales_order_item"
+    source_entity: "dim_product"
+    target_entity: "fact_sales_order_item"
+    join_type: "LEFT"
+    cardinality: "ONE_TO_MANY"
+    source_key: "enterprise_product_id"
+    target_key: "product_id"
+    description: "Links product catalog SKUs to sales order line items"
+
+  supplier_to_purchase_order:
+    name: "supplier_to_purchase_order"
+    source_entity: "dim_supplier"
+    target_entity: "fact_purchase_order"
+    join_type: "LEFT"
+    cardinality: "ONE_TO_MANY"
+    source_key: "vendor_id"
+    target_key: "vendor_id"
+    description: "Links supplier master records to procurement purchase orders"
+
+  purchase_order_to_item:
+    name: "purchase_order_to_item"
+    source_entity: "fact_purchase_order"
+    target_entity: "fact_purchase_order_item"
+    join_type: "INNER"
+    cardinality: "ONE_TO_MANY"
+    source_key: "purchase_order_id"
+    target_key: "purchase_order_id"
+    description: "Links purchase order headers to procurement detail line items"
+
+  lead_to_lead_event:
+    name: "lead_to_lead_event"
+    source_entity: "dim_lead"
+    target_entity: "fact_lead_event"
+    join_type: "LEFT"
+    cardinality: "ONE_TO_MANY"
+    source_key: "mql_id"
+    target_key: "mql_id"
+    description: "Links marketing qualified leads to historical activity events"
+
+  employee_to_purchase_order:
+    name: "employee_to_purchase_order"
+    source_entity: "dim_employee"
+    target_entity: "fact_purchase_order"
+    join_type: "LEFT"
+    cardinality: "ONE_TO_MANY"
+    source_key: "employee_id"
+    target_key: "employee_id"
+    description: "Links employee HR directory to purchase order headers"
+

@@ -6,6 +6,7 @@ a live cloud connection or raises. Failure is never silently downgraded.
 
 import logging
 import re
+import threading
 from urllib.parse import quote_plus
 
 from sqlalchemy import create_engine, text
@@ -21,6 +22,7 @@ logger = logging.getLogger("pwa.connections")
 # pipeline step call.
 # ---------------------------------------------------------------------------
 _BQ_CLIENT: bigquery.Client | None = None
+_BQ_CLIENT_LOCK = threading.Lock()
 
 
 def mask_credentials(text_msg: str) -> str:
@@ -164,21 +166,36 @@ def get_bq_client(project: str = "", location: str = "") -> bigquery.Client:
         except Exception:
             import os
 
-            gcp_project = project or os.getenv("GCP_PROJECT", "salitsteel-502008")
+            # No hardcoded real-project fallback: an unset/misconfigured
+            # environment should fail visibly, not silently query a specific
+            # project nobody chose for this run.
+            gcp_project = project or os.getenv("GCP_PROJECT", "GCP_PROJECT_NOT_CONFIGURED")
             bq_location = location or os.getenv("BQ_LOCATION", "EU")
         return bigquery.Client(project=gcp_project, location=bq_location)
 
     if _BQ_CLIENT is None:
-        try:
-            settings = get_settings()
-            gcp_project = settings.gcp_project
-            bq_location = settings.bq_location
-        except Exception:
-            import os
+        with _BQ_CLIENT_LOCK:
+            # Re-check inside the lock: another thread may have built it
+            # while this one was waiting.
+            if _BQ_CLIENT is None:
+                try:
+                    settings = get_settings()
+                    gcp_project = settings.gcp_project
+                    bq_location = settings.bq_location
+                except Exception:
+                    import os
 
-            gcp_project = os.getenv("GCP_PROJECT", "salitsteel-502008")
-            bq_location = os.getenv("BQ_LOCATION", "EU")
-        logger.debug("[BQ Client] Initialising singleton BigQuery client.")
-        _BQ_CLIENT = bigquery.Client(project=gcp_project, location=bq_location)
+                    gcp_project = os.getenv("GCP_PROJECT", "GCP_PROJECT_NOT_CONFIGURED")
+                    bq_location = os.getenv("BQ_LOCATION", "EU")
+                logger.debug("[BQ Client] Initialising singleton BigQuery client.")
+                _BQ_CLIENT = bigquery.Client(project=gcp_project, location=bq_location)
 
     return _BQ_CLIENT
+
+
+def invalidate_bq_client_cache() -> None:
+    """Reset the process-level BigQuery client singleton."""
+    global _BQ_CLIENT
+    with _BQ_CLIENT_LOCK:
+        _BQ_CLIENT = None
+    logger.info("[BQ Client Cache] Invalidated BigQuery client singleton.")

@@ -1,0 +1,59 @@
+dataset:
+  name: adventureworks
+  provider: kaggle
+  kaggle_slug: tituspr/adventureworks2022-excel-format
+  source_url: https://www.kaggle.com/datasets/tituspr/adventureworks2022-excel-format
+  domain: enterprise
+  license: Community Data License Agreement – Permissive – Version 1.0
+  license_url: https://cdla.dev/permissive-1-0/
+  description: AdventureWorks 2022 in Excel format. Contains Sales, Production, Human
+    Resources, and Purchasing schemas used as Nexora's internal ERP source.
+  downloaded_at: '2026-09-13T10:28:38.343978+00:00'
+  version: snapshot
+  synthetic_reference_data: false
+  files:
+  - filename: HumanResources.Department.csv
+    size_bytes: 400
+    sha256: 499ab36bee33574898978f3b3a37fc5f2889b294db3a71fb58a789179e90c613
+  - filename: HumanResources.Employee.csv
+    size_bytes: 2178
+    sha256: 396ad14c162701c6fa20f1c03b60018ab800c46ad68bb35b54cad6f599b839a4
+  - filename: HumanResources.EmployeeDepartmentHistory.csv
+    size_bytes: 526
+    sha256: 2fb758871644086ffe933411868d995a6e06bd59cb67e3e4571df8296b3b6d4f
+  - filename: Person.Address.csv
+    size_bytes: 2342
+    sha256: 3a265612106844f90654e755edd9fe1fa98c941cab840a71c09d920f92ad1ea5
+  - filename: Person.Person.csv
+    size_bytes: 2208
+    sha256: 93575cbb9667dc5fca5e254b3c39af2e1be7e2689917a194c7d78a09bdb95bd8
+  - filename: Production.Product.csv
+    size_bytes: 2990
+    sha256: 4ea536955018dba144018008a173791eff50dccf27818577099552da819a8b5b
+  - filename: Production.ProductCategory.csv
+    size_bytes: 183
+    sha256: 6901859f4838422cdd4c61c93958e610a824273c8ec900c469214b1bb2587f9d
+  - filename: Production.ProductSubcategory.csv
+    size_bytes: 313
+    sha256: f6114326edb25ecb763fc7aaa8d5dc781ff6987d69dda8bef51dda667aa9157a
+  - filename: Purchasing.PurchaseOrderDetail.csv
+    size_bytes: 3081
+    sha256: a7d8e1a1bf63fda7af88a627210d2f72f579277630acc1ea0a6c7a95507afd04
+  - filename: Purchasing.PurchaseOrderHeader.csv
+    size_bytes: 2019
+    sha256: 308b4c1d8742e0208fb6c490d7c349506a2c1bef352b130fcf771418d45ba86b
+  - filename: Purchasing.Vendor.csv
+    size_bytes: 953
+    sha256: 391c486600b30fce20d8bd0a181efda4c2782f8184de491d00b1ccdbdce8aa70
+  - filename: Sales.Customer.csv
+    size_bytes: 1302
+    sha256: b309b86d4311f07d8f51e4d913f4074a402fe0bf5b669d11c0f668a106c3a887
+  - filename: Sales.SalesOrderDetail.csv
+    size_bytes: 7301
+    sha256: 2ef31058cd7cfa81cb07dd40c6de8add1c52a99e1f024e779b29f48903128794
+  - filename: Sales.SalesOrderHeader.csv
+    size_bytes: 9237
+    sha256: d8e6c8e1880eebee1caff1e0865f344b5c1e3b4a8676e1468be60f5dd5306b3d
+  - filename: Sales.SalesTerritory.csv
+    size_bytes: 501
+    sha256: d0e9f12b260671365a3399c084e14c31212ad3d96311774bf4e9f2a9078fe993

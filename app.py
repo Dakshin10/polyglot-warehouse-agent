@@ -50,8 +50,13 @@ except Exception as _import_exc:
 def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResult:
     """Stub orchestrator used for testing or when live backend is unavailable."""
     stages = [
-        ("grounding", {"schema": "mart.v_movie, mart.v_revenue_by_year"}),
-        ("sql", {"sql": "SELECT title, revenue FROM mart.v_movie ORDER BY revenue DESC LIMIT 3;"}),
+        ("grounding", {"schema": "mart.v_sales_order_line, mart.v_product_catalog"}),
+        (
+            "sql",
+            {
+                "sql": "SELECT order_year, SUM(line_total_usd) as total_sales FROM mart.v_sales_order_line GROUP BY order_year ORDER BY order_year;"
+            },
+        ),
         ("validate", {"status": "SUCCESS"}),
         ("synthesize", {}),
     ]
@@ -64,29 +69,30 @@ def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResul
             stage_callback(stage_name, "completed", extra)
 
     return PipelineResult(
-        answer="The top 3 movies by revenue are Avatar ($2.92B), Avengers: Endgame ($2.79B), and Titanic ($2.26B).",
-        sql="SELECT title, revenue FROM mart.v_movie ORDER BY revenue DESC LIMIT 3;",
+        answer="Total sales revenue was $1.2M in 2011, $3.4M in 2012, $4.8M in 2013, and $5.1M in 2014.",
+        sql="SELECT order_year, SUM(line_total_usd) as total_sales FROM mart.v_sales_order_line GROUP BY order_year ORDER BY order_year;",
         rows=[
-            {"title": "Avatar", "revenue": 2923706026},
-            {"title": "Avengers: Endgame", "revenue": 2797501328},
-            {"title": "Titanic", "revenue": 2264162310},
+            {"order_year": 2011, "total_sales": 1200000.0},
+            {"order_year": 2012, "total_sales": 3400000.0},
+            {"order_year": 2013, "total_sales": 4800000.0},
+            {"order_year": 2014, "total_sales": 5100000.0},
         ],
         bytes_scanned=2147483648,
         stage_latencies={"schema": 0.42, "sql": 0.65, "exec": 0.38, "answer": 0.35},
-        row_count=3,
+        row_count=4,
         viz_recommendation={
             "primary": {
                 "type": "bar",
-                "x_col": "title",
-                "y_col": "revenue",
-                "reason": "3 movies ranked by revenue — a bar chart makes the ordering immediately scannable.",
+                "x_col": "order_year",
+                "y_col": "total_sales",
+                "reason": "Annual sales trend across 4 years — a bar chart compares sales across financial years.",
             },
             "alternatives": [
                 {
                     "type": "table",
                     "x_col": None,
                     "y_col": None,
-                    "reason": "Table view shows all columns and exact revenue figures.",
+                    "reason": "Table view shows exact sales figures per year.",
                 },
             ],
         },
@@ -101,13 +107,38 @@ def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResul
         ],
         data_provenance=[
             {
-                "table_name": "mart.v_movie",
+                "table_name": "mart.v_sales_order_line",
                 "type": "base_mart_view",
-                "description": "Base movie view",
+                "description": "Base sales order line view",
                 "last_refreshed": "Live transactional data",
             }
         ],
     )
+
+
+def _audit_query(username: str, question: str, result: Any) -> None:
+    """Best-effort per-user audit trail for real (non-stub) queries.
+
+    Never raises into the chat flow: a query-audit failure should degrade to
+    "not logged," not "the user got an error instead of their answer."
+    """
+    try:
+        from pwa.control_plane.metadata import ControlPlaneManager
+
+        if "_pwa_control_plane_mgr" not in st.session_state:
+            st.session_state["_pwa_control_plane_mgr"] = ControlPlaneManager()
+        mgr = st.session_state["_pwa_control_plane_mgr"]
+
+        status = getattr(result, "exec_status", "SUCCESS") if not isinstance(result, str) else "ERROR"
+        mgr.record_audit_log(
+            event_type="UI_QUERY",
+            message=f"user='{username}' status={status} question={question[:200]!r}",
+            source_name="streamlit_ui",
+        )
+    except Exception as exc:  # pragma: no cover - best-effort, never fatal
+        import logging
+
+        logging.getLogger("pwa.ui.app").debug(f"Query audit logging failed: {exc}")
 
 
 def _render_assistant_avatar() -> None:
@@ -174,6 +205,13 @@ def main() -> None:
     # Apply Custom Grayscale & Typography CSS
     apply_custom_styles()
 
+    # Auth gate — no-op (returns "anonymous") if PWA_AUTH_USERS isn't
+    # configured, but always renders a banner so an open deployment is
+    # visibly open rather than silently open.
+    from pwa.ui.auth import require_login
+
+    current_user = require_login()
+
     # Render Minimal Header (small top-left wordmark)
     render_header()
 
@@ -223,6 +261,7 @@ def main() -> None:
             try:
                 if _REAL_ORCHESTRATOR_AVAILABLE and os.getenv("PWA_USE_STUB_UI") != "1":
                     res = run_query_verbose(prompt, stage_callback=_stage_cb)
+                    _audit_query(current_user, prompt, res)
                 else:
                     res = _stub_run_query_verbose(prompt, stage_callback=_stage_cb)
             except Exception as exc:

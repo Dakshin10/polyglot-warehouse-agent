@@ -34,8 +34,8 @@ def test_stub_run_query_verbose():
     res = _stub_run_query_verbose("test question", stage_callback=_cb)
 
     assert isinstance(res, PipelineResult)
-    assert "Avatar" in res.answer
-    assert res.row_count == 3
+    assert "Total sales revenue" in res.answer
+    assert res.row_count == 4
     assert len(callback_calls) == 8  # 4 stages * 2 events (started, completed)
 
 
@@ -47,9 +47,9 @@ def test_component_renders(mock_markdown):
 
     render_header()
     render_thinking_status("grounding")
-    render_answer_panel("The top movie is Avatar.")
+    render_answer_panel("Total sales revenue was $1.2M in 2011.")
     render_rejection_panel("Static SQL Validation Failed", "DROP TABLE test;")
-    render_history_panel(["which 3 movies had the highest revenue?"])
+    render_history_panel(["what was the total sales revenue in 2014?"])
 
 
 @patch("streamlit.expander")
@@ -58,9 +58,9 @@ def test_component_renders(mock_markdown):
 def test_evidence_panel(mock_df, mock_code, mock_expander):
     """Test evidence panel renders expanders for SQL, data, and metadata."""
     res = PipelineResult(
-        answer="Avatar is top.",
-        sql="SELECT * FROM mart.v_movie;",
-        rows=[{"title": "Avatar"}],
+        answer="Total sales revenue was $5.1M in 2014.",
+        sql="SELECT * FROM mart.v_sales_order_line;",
+        rows=[{"order_year": 2014, "total_sales": 5100000.0}],
         bytes_scanned=1000,
         stage_latencies={"sql": 0.5},
         row_count=1,

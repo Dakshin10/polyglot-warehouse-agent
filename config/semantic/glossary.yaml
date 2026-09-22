@@ -1,0 +1,44 @@
+# Governed Enterprise Business Glossary for Nexora Technologies
+
+glossary:
+  Revenue:
+    name: "Revenue"
+    definition: "Total monetary value of sales order transactions invoiced to customers"
+    synonyms: ["sales", "turnover", "invoiced sales", "gross revenue"]
+    related_entities: ["fact_sales_order"]
+    related_measures: ["revenue"]
+
+  Customer:
+    name: "Customer"
+    definition: "An individual or organization that purchases products or services from Nexora Technologies"
+    synonyms: ["buyer", "client", "purchaser", "account"]
+    related_entities: ["dim_customer"]
+    related_dimensions: ["customer"]
+
+  Product:
+    name: "Product"
+    definition: "A physical good or catalog SKU offered for sale by Nexora Technologies"
+    synonyms: ["item", "sku", "goods", "catalog item"]
+    related_entities: ["dim_product"]
+    related_dimensions: ["product", "product_category"]
+
+  Supplier:
+    name: "Supplier"
+    definition: "An external vendor providing raw goods, components, or services to Nexora"
+    synonyms: ["vendor", "distributor", "provider"]
+    related_entities: ["dim_supplier"]
+    related_measures: ["purchase_amount"]
+
+  Inventory:
+    name: "Inventory"
+    definition: "Quantity of product stock held across Nexora enterprise warehouse locations"
+    synonyms: ["stock", "units on hand", "warehouse stock"]
+    related_entities: ["fact_inventory"]
+    related_measures: ["inventory_quantity"]
+
+  Lead:
+    name: "Lead"
+    definition: "A prospective customer account identified via marketing campaigns"
+    synonyms: ["prospect", "mql", "marketing lead"]
+    related_entities: ["dim_lead"]
+    related_measures: ["lead_count"]

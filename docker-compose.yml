@@ -1,0 +1,50 @@
+# Local development / demo stack. Production deployment (Cloud Run, GKE, etc.)
+# should build the same Dockerfile image directly rather than running compose.
+#
+# Usage:
+#   docker compose up --build            # app only, in-process cache
+#   docker compose --profile cache up     # app + Redis-backed semantic cache
+#
+# Secrets (GCP credentials, DB passwords, etc.) are read from a local .env
+# file via env_file — never bake them into the image.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
+    environment:
+      # Set to redis://redis:6379/0 to use the `cache` profile's Redis service.
+      PWA_REDIS_URL: ${PWA_REDIS_URL:-}
+    depends_on:
+      redis:
+        condition: service_started
+        required: false
+
+  redis:
+    image: redis:7-alpine
+    profiles: ["cache"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+  dagster:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["orchestration"]
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    command: ["dagster", "dev", "-m", "pwa.orchestration.dagster_defs", "-h", "0.0.0.0", "-p", "3000"]
+
+volumes:
+  redis-data:
+

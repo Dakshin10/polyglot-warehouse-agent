@@ -1,23 +1,20 @@
-"""Data preprocessing and ETL pipeline subpackage.
+"""Data preprocessing and ETL pipeline subpackage — Nexora Enterprise Platform.
 
-Contains modules for raw data download, transformation/filtering, database loading,
-and BigQuery landing & mart view creation.
+Contains modules for:
+  - Multi-dataset Kaggle download (kaggle_download.py)
+  - BigQuery infrastructure setup (bigquery_setup.py)
+  - Metadata/control plane setup (pwa_metadata_setup.py)
+  - Raw ingestion per source (adventureworks_ingest.py, olist_ingest.py, olist_marketing_ingest.py)
+  - Staging normalization (staging_enterprise.py, staging_marketplace.py)
+  - Curated model building (curated_enterprise.py, curated_marketplace.py)
+  - BigQuery mart view creation (bigquery_mart.py)
+  - Generic utilities (bigquery_load_csv.py, bigquery_replicate.py)
 """
 
-from pwa.preprocessing.bigquery_load_csv import load_csvs
-from pwa.preprocessing.bigquery_mart import build_mart
-from pwa.preprocessing.bigquery_replicate import replicate_mysql
 from pwa.preprocessing.bigquery_setup import run_setup
-from pwa.preprocessing.kaggle_download import download_dataset
-from pwa.preprocessing.movie_transform import transform_and_select
-from pwa.preprocessing.source_db_load import load_data
+from pwa.preprocessing.kaggle_download import download_all_datasets
 
 __all__ = [
-    "download_dataset",
-    "transform_and_select",
-    "load_data",
+    "download_all_datasets",
     "run_setup",
-    "replicate_mysql",
-    "load_csvs",
-    "build_mart",
 ]

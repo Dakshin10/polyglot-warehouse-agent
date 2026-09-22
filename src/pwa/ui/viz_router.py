@@ -21,7 +21,10 @@ Returns a dict::
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional
+
+from pwa.semantic.result_contract import QueryResult
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -43,7 +46,7 @@ _TREND_KEYWORDS: tuple[str, ...] = (
 )
 
 # Patterns that identify year-like columns by name
-_YEAR_COL_PATTERN = re.compile(r"\b(year|yr|date|month|quarter|period)\b", re.IGNORECASE)
+_YEAR_COL_PATTERN = re.compile(r"(year|yr|date|month|quarter|period)", re.IGNORECASE)
 
 
 def _is_numeric(series) -> bool:  # type: ignore[type-arg]
@@ -139,8 +142,8 @@ def choose_visualization(df: "pd.DataFrame", question: str) -> dict:
 
     trend_signal = _has_trend_keyword(question)
 
-    # ── Rule 3: datetime/year col + exactly one value numeric col → line ──
-    if datetime_cols and len(value_numeric_cols) == 1:
+    # ── Rule 3: datetime/year col + value numeric col(s) → line ──────────────
+    if datetime_cols and value_numeric_cols:
         return {"type": "line", "x": datetime_cols[0], "y": value_numeric_cols[0]}
 
     # ── Rule 4: trend keyword upgrades ambiguous bar → line ───────────────
@@ -165,3 +168,70 @@ def choose_visualization(df: "pd.DataFrame", question: str) -> dict:
 
     # ── Default: too complex → table ──────────────────────────────────────
     return _fallback
+
+
+@dataclass
+class VisualizationSpec:
+    """Structured specification for visual representations."""
+
+    type: str  # metric_card | table | bar | line | scatter
+    x_col: Optional[str] = None
+    y_col: Optional[str] = None
+    reasoning: str = ""
+
+
+class VisualizationRouter:
+    """Recommends VisualizationSpec based on QueryResult shape and workflow hints."""
+
+    def recommend_visualization(self, query_result: QueryResult) -> VisualizationSpec:
+        """Derive VisualizationSpec from QueryResult metadata."""
+        hint = (query_result.visualization_hint or "").lower()
+        cols = query_result.columns
+        row_count = query_result.row_count
+
+        if hint in ("metric_card", "single_kpi") or (row_count == 1 and len(cols) <= 2):
+            y_c = cols[0] if cols else None
+            return VisualizationSpec(type="metric_card", y_col=y_c, reasoning="Single numeric metric aggregate.")
+
+        if hint == "cohort_heatmap" or any("cohort" in c.lower() for c in cols):
+            return VisualizationSpec(
+                type="cohort_heatmap", x_col="cohort_month", y_col="retention_pct", reasoning="Cohort retention matrix."
+            )
+
+        if hint == "funnel" or any("stage" in c.lower() or "dropoff" in c.lower() for c in cols):
+            return VisualizationSpec(
+                type="funnel",
+                x_col=cols[0] if cols else "stage_name",
+                y_col=cols[1] if len(cols) > 1 else "lead_count",
+                reasoning="Funnel conversion dropoff chart.",
+            )
+
+        if hint == "retention_curve" or any("retention" in c.lower() for c in cols):
+            return VisualizationSpec(
+                type="retention_curve",
+                x_col="period_offset",
+                y_col="retention_rate",
+                reasoning="Customer retention decay curve.",
+            )
+
+        if hint == "pareto" or any("abc_class" in c.lower() or "cumulative" in c.lower() for c in cols):
+            return VisualizationSpec(
+                type="pareto",
+                x_col=cols[0] if cols else "product_name",
+                y_col=cols[1] if len(cols) > 1 else "revenue",
+                reasoning="Pareto ABC product distribution.",
+            )
+
+        if hint == "line" or any("date" in c.lower() or "time" in c.lower() or "month" in c.lower() for c in cols):
+            x_c = cols[0] if cols else None
+            y_c = cols[1] if len(cols) > 1 else None
+            return VisualizationSpec(
+                type="line", x_col=x_c, y_col=y_c, reasoning="Time-series or temporal trend query."
+            )
+
+        if hint == "bar" or (len(cols) >= 2 and row_count <= 30):
+            x_c = cols[0] if cols else None
+            y_c = cols[1] if len(cols) > 1 else None
+            return VisualizationSpec(type="bar", x_col=x_c, y_col=y_c, reasoning="Category ranking comparison.")
+
+        return VisualizationSpec(type="table", reasoning="Multi-column tabular dataset.")

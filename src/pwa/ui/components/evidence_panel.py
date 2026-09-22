@@ -63,9 +63,12 @@ def render_evidence_panel(
             from pwa.ui.components.viz_panel import render_viz_panel
 
             render_viz_panel(df, viz_rec_dict, msg_idx=msg_idx, question=question)
-        except Exception:
-            # Visualization is best-effort; never crash the UI over a chart
-            pass
+        except Exception as exc:
+            import logging
+
+            logger = logging.getLogger("pwa.ui.evidence_panel")
+            logger.error(f"Visualization panel error: {exc}", exc_info=True)
+            st.warning(f"⚠️ Visualization component error: {exc}")
 
     # ── 1. Generated SQL Expander ─────────────────────────────────────────────
     if sql:

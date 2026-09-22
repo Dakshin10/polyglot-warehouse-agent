@@ -19,27 +19,27 @@ from pwa.agent.pipeline.exec_agent import ast_validate_sql
 
 class TestValidSelects:
     def test_simple_select_passes(self):
-        sql = "SELECT title, revenue_usd FROM `salitsteel-502008.mart.v_movie` LIMIT 10"
+        sql = "SELECT sales_order_id, line_total_usd FROM `salitsteel-502008.mart.v_sales_order_line` LIMIT 10"
         ast_validate_sql(sql)  # Should not raise
 
     def test_select_with_where_passes(self):
-        sql = "SELECT title, release_year FROM `salitsteel-502008.mart.v_movie` WHERE release_year = 2010 LIMIT 5"
+        sql = "SELECT sales_order_id, order_date FROM `salitsteel-502008.mart.v_sales_order_line` WHERE order_year = 2014 LIMIT 5"
         ast_validate_sql(sql)
 
     def test_select_with_join_passes(self):
         sql = (
-            "SELECT m.title, c.director_name "
-            "FROM `salitsteel-502008.mart.v_movie` m "
-            "JOIN `salitsteel-502008.mart.v_movie_credits` c ON m.movie_id = c.movie_id "
+            "SELECT o.sales_order_id, p.product_name "
+            "FROM `salitsteel-502008.mart.v_sales_order_line` o "
+            "JOIN `salitsteel-502008.mart.v_product_catalog` p ON o.product_id = p.product_id "
             "LIMIT 10"
         )
         ast_validate_sql(sql)
 
     def test_aggregate_select_passes(self):
         sql = (
-            "SELECT primary_genre, COUNT(*) AS cnt, ROUND(AVG(revenue_usd), 2) AS avg_rev "
-            "FROM `salitsteel-502008.mart.v_movie` "
-            "GROUP BY primary_genre ORDER BY cnt DESC LIMIT 5"
+            "SELECT category_name, COUNT(*) AS cnt, ROUND(AVG(list_price_usd), 2) AS avg_price "
+            "FROM `salitsteel-502008.mart.v_product_catalog` "
+            "GROUP BY category_name ORDER BY cnt DESC LIMIT 5"
         )
         ast_validate_sql(sql)
 
@@ -47,29 +47,29 @@ class TestValidSelects:
         """EXTERNAL_QUERY federated patterns must survive AST validation."""
         sql = (
             "SELECT * FROM EXTERNAL_QUERY("
-            "'salitsteel-502008.EU.movie-credits-conn', "
-            "'SELECT movie_id, director_name FROM movie_credits LIMIT 10')"
+            "'salitsteel-502008.EU.olist-conn', "
+            "'SELECT order_id, payment_value FROM orders LIMIT 10')"
         )
         ast_validate_sql(sql)
 
     def test_cte_select_passes(self):
         sql = (
-            "WITH top_movies AS ("
-            "  SELECT movie_id, title, revenue_usd "
-            "  FROM `salitsteel-502008.mart.v_movie` "
-            "  ORDER BY revenue_usd DESC LIMIT 10"
+            "WITH top_sales AS ("
+            "  SELECT sales_order_id, product_id, line_total_usd "
+            "  FROM `salitsteel-502008.mart.v_sales_order_line` "
+            "  ORDER BY line_total_usd DESC LIMIT 10"
             ") "
-            "SELECT t.title, c.director_name "
-            "FROM top_movies t "
-            "JOIN `salitsteel-502008.mart.v_movie_credits` c ON t.movie_id = c.movie_id"
+            "SELECT t.sales_order_id, p.product_name "
+            "FROM top_sales t "
+            "JOIN `salitsteel-502008.mart.v_product_catalog` p ON t.product_id = p.product_id"
         )
         ast_validate_sql(sql)
 
     def test_subquery_select_passes(self):
         sql = (
-            "SELECT title FROM ("
-            "  SELECT title, revenue_usd FROM `salitsteel-502008.mart.v_movie`"
-            ") sub ORDER BY revenue_usd DESC LIMIT 3"
+            "SELECT sales_order_id FROM ("
+            "  SELECT sales_order_id, line_total_usd FROM `salitsteel-502008.mart.v_sales_order_line`"
+            ") sub ORDER BY line_total_usd DESC LIMIT 3"
         )
         ast_validate_sql(sql)
 
@@ -81,32 +81,32 @@ class TestValidSelects:
 
 class TestTopLevelForbiddenStatements:
     def test_drop_table_rejected(self):
-        sql = "DROP TABLE `salitsteel-502008.mart.v_movie`"
+        sql = "DROP TABLE `salitsteel-502008.mart.v_sales_order_line`"
         with pytest.raises(ValueError, match="Only SELECT statements are allowed"):
             ast_validate_sql(sql)
 
     def test_delete_rejected(self):
-        sql = "DELETE FROM `salitsteel-502008.mart.v_movie` WHERE 1=1"
+        sql = "DELETE FROM `salitsteel-502008.mart.v_sales_order_line` WHERE 1=1"
         with pytest.raises(ValueError, match="Only SELECT statements are allowed"):
             ast_validate_sql(sql)
 
     def test_update_rejected(self):
-        sql = "UPDATE `salitsteel-502008.mart.v_movie` SET title = 'Hacked' WHERE movie_id = 1"
+        sql = "UPDATE `salitsteel-502008.mart.v_sales_order_line` SET line_total_usd = 0 WHERE sales_order_id = 1"
         with pytest.raises(ValueError, match="Only SELECT statements are allowed"):
             ast_validate_sql(sql)
 
     def test_insert_rejected(self):
-        sql = "INSERT INTO `salitsteel-502008.mart.v_movie` (title) VALUES ('Evil Row')"
+        sql = "INSERT INTO `salitsteel-502008.mart.v_sales_order_line` (sales_order_id) VALUES (999)"
         with pytest.raises(ValueError, match="Only SELECT statements are allowed"):
             ast_validate_sql(sql)
 
     def test_create_table_rejected(self):
-        sql = "CREATE TABLE `salitsteel-502008.mart.exfil` AS SELECT * FROM `salitsteel-502008.mart.v_movie`"
+        sql = "CREATE TABLE `salitsteel-502008.mart.exfil` AS SELECT * FROM `salitsteel-502008.mart.v_sales_order_line`"
         with pytest.raises(ValueError, match="Only SELECT statements are allowed"):
             ast_validate_sql(sql)
 
     def test_truncate_rejected(self):
-        sql = "TRUNCATE TABLE `salitsteel-502008.mart.v_movie`"
+        sql = "TRUNCATE TABLE `salitsteel-502008.mart.v_sales_order_line`"
         with pytest.raises(ValueError, match="Only SELECT statements are allowed"):
             ast_validate_sql(sql)
 
@@ -119,18 +119,18 @@ class TestTopLevelForbiddenStatements:
 class TestWriteHiddenInCTE:
     def test_delete_inside_cte_rejected(self):
         """A DELETE smuggled inside a CTE must be rejected by the AST walker."""
-        sql = "WITH evil AS (  DELETE FROM `salitsteel-502008.mart.v_movie` WHERE 1=1) SELECT 1"
+        sql = "WITH evil AS (  DELETE FROM `salitsteel-502008.mart.v_sales_order_line` WHERE 1=1) SELECT 1"
         with pytest.raises(ValueError):
             ast_validate_sql(sql)
 
     def test_insert_inside_cte_rejected(self):
-        sql = "WITH evil AS (  INSERT INTO `salitsteel-502008.mart.v_movie` (title) VALUES ('x')) SELECT 1"
+        sql = "WITH evil AS (  INSERT INTO `salitsteel-502008.mart.v_sales_order_line` (sales_order_id) VALUES (1)) SELECT 1"
         with pytest.raises(ValueError):
             ast_validate_sql(sql)
 
     def test_drop_inside_subquery_rejected(self):
         """Demonstrates AST catch of DROP nested in a sub-expression."""
-        sql = "SELECT (DROP TABLE `salitsteel-502008.mart.v_movie`)"
+        sql = "SELECT (DROP TABLE `salitsteel-502008.mart.v_sales_order_line`)"
         with pytest.raises(ValueError):
             ast_validate_sql(sql)
 
@@ -170,11 +170,11 @@ class TestMalformedSQL:
 class TestEdgeCases:
     def test_select_with_comment_passes(self):
         """SQL with comments must still parse and pass."""
-        sql = "-- get top movies\nSELECT title, revenue_usd FROM `salitsteel-502008.mart.v_movie` LIMIT 5"
+        sql = "-- get sales\nSELECT sales_order_id, line_total_usd FROM `salitsteel-502008.mart.v_sales_order_line` LIMIT 5"
         ast_validate_sql(sql)
 
     def test_backtick_wrapped_sql_passes(self):
-        sql = "SELECT `title` FROM `salitsteel-502008.mart.v_movie` LIMIT 1"
+        sql = "SELECT `sales_order_id` FROM `salitsteel-502008.mart.v_sales_order_line` LIMIT 1"
         ast_validate_sql(sql)
 
     def test_select_1_passes(self):

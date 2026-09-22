@@ -1,0 +1,65 @@
+# Configuration-driven Quality Rules for PWA Enterprise Platform
+# Defines expected constraints per operational source table for automated quality gates.
+
+sources:
+  cloudflare_d1:
+    departments:
+      primary_key:
+        columns: [department_id]
+        unique: true
+      nullability:
+        not_null_columns: [department_id, name]
+      freshness_sla_minutes: 1440
+
+    employees:
+      primary_key:
+        columns: [employee_id]
+        unique: true
+      nullability:
+        not_null_columns: [employee_id, job_title, hire_date]
+      freshness_sla_minutes: 1440
+
+    customers:
+      primary_key:
+        columns: [customer_id]
+        unique: true
+      nullability:
+        not_null_columns: [customer_id, account_number]
+      freshness_sla_minutes: 1440
+
+  alloydb:
+    products:
+      primary_key:
+        columns: [product_id]
+        unique: true
+      nullability:
+        not_null_columns: [product_id, name, list_price]
+      freshness_sla_minutes: 1440
+
+    sales_orders:
+      primary_key:
+        columns: [sales_order_id]
+        unique: true
+      nullability:
+        not_null_columns: [sales_order_id, customer_id, order_date, total_due]
+      numeric_ranges:
+        total_due:
+          min_val: 0
+      freshness_sla_minutes: 60
+
+  aiven_mysql:
+    suppliers:
+      primary_key:
+        columns: [vendor_id]
+        unique: true
+      nullability:
+        not_null_columns: [vendor_id, name]
+      freshness_sla_minutes: 1440
+
+    purchase_orders:
+      primary_key:
+        columns: [purchase_order_id]
+        unique: true
+      nullability:
+        not_null_columns: [purchase_order_id, vendor_id, total_due]
+      freshness_sla_minutes: 360

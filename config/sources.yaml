@@ -1,0 +1,275 @@
+# Source registry configuration for the Nexora Technologies enterprise platform.
+# This file is the single source of truth for all registered data sources.
+#
+# Consumed by: src/pwa/source_registry.py
+# Extended by: Milestone 4 (Source Registry)
+
+sources:
+  - name: adventureworks
+    type: file
+    provider: kaggle
+    slug: tituspr/adventureworks2022-excel-format
+    source_url: https://www.kaggle.com/datasets/tituspr/adventureworks2022-excel-format
+    domain: enterprise
+    description: >
+      AdventureWorks 2022 - Nexora internal ERP source.
+      Contains Sales, Production, Human Resources, and Purchasing schemas.
+    ingestion_mode: snapshot
+    local_path: data/source/adventureworks/
+    bq_raw_dataset: raw_adventureworks
+    license: CDLA-Permissive-1.0
+    tables:
+      - name: sales_order_header
+        source_file_pattern: "Sales.SalesOrderHeader*"
+        primary_key: SalesOrderID
+        watermark_column: OrderDate
+      - name: sales_order_detail
+        source_file_pattern: "Sales.SalesOrderDetail*"
+        primary_key: SalesOrderDetailID
+      - name: product
+        source_file_pattern: "Production.Product*"
+        primary_key: ProductID
+      - name: product_category
+        source_file_pattern: "Production.ProductCategory*"
+        primary_key: ProductCategoryID
+      - name: product_subcategory
+        source_file_pattern: "Production.ProductSubcategory*"
+        primary_key: ProductSubcategoryID
+      - name: customer
+        source_file_pattern: "Sales.Customer*"
+        primary_key: CustomerID
+      - name: person
+        source_file_pattern: "Person.Person*"
+        primary_key: BusinessEntityID
+      - name: employee
+        source_file_pattern: "HumanResources.Employee*"
+        primary_key: BusinessEntityID
+        watermark_column: ModifiedDate
+      - name: department
+        source_file_pattern: "HumanResources.Department*"
+        primary_key: DepartmentID
+      - name: employee_department_history
+        source_file_pattern: "HumanResources.EmployeeDepartmentHistory*"
+        primary_key: null
+      - name: vendor
+        source_file_pattern: "Purchasing.Vendor*"
+        primary_key: BusinessEntityID
+      - name: purchase_order_header
+        source_file_pattern: "Purchasing.PurchaseOrderHeader*"
+        primary_key: PurchaseOrderID
+        watermark_column: OrderDate
+      - name: purchase_order_detail
+        source_file_pattern: "Purchasing.PurchaseOrderDetail*"
+        primary_key: PurchaseOrderDetailID
+      - name: sales_territory
+        source_file_pattern: "Sales.SalesTerritory*"
+        primary_key: TerritoryID
+      - name: address
+        source_file_pattern: "Person.Address*"
+        primary_key: AddressID
+
+  - name: olist
+    type: file
+    provider: kaggle
+    slug: olistbr/brazilian-ecommerce
+    source_url: https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce
+    domain: marketplace
+    description: >
+      Olist Brazilian E-Commerce Dataset - Nexora external marketplace channel.
+      ~100,000 orders 2016-2018. Non-commercial use only (CC BY-NC-SA 4.0).
+    ingestion_mode: snapshot
+    local_path: data/source/olist/
+    bq_raw_dataset: raw_olist
+    license: CC BY-NC-SA 4.0
+    tables:
+      - name: olist_orders
+        source_file_pattern: olist_orders_dataset.csv
+        primary_key: order_id
+        watermark_column: order_purchase_timestamp
+      - name: olist_customers
+        source_file_pattern: olist_customers_dataset.csv
+        primary_key: customer_id
+        notes: >
+          customer_id is per-order; customer_unique_id identifies the same
+          physical customer across orders. Preserve both.
+      - name: olist_order_items
+        source_file_pattern: olist_order_items_dataset.csv
+        primary_key: null
+        notes: Composite key (order_id, order_item_id)
+      - name: olist_order_payments
+        source_file_pattern: olist_order_payments_dataset.csv
+        primary_key: null
+        notes: One order may have multiple payment rows (different methods)
+      - name: olist_order_reviews
+        source_file_pattern: olist_order_reviews_dataset.csv
+        primary_key: review_id
+        watermark_column: review_creation_date
+      - name: olist_products
+        source_file_pattern: olist_products_dataset.csv
+        primary_key: product_id
+      - name: olist_sellers
+        source_file_pattern: olist_sellers_dataset.csv
+        primary_key: seller_id
+      - name: olist_geolocation
+        source_file_pattern: olist_geolocation_dataset.csv
+        primary_key: null
+        notes: Multiple rows per zip_code_prefix; use as reference table
+      - name: olist_product_category_translation
+        source_file_pattern: product_category_name_translation.csv
+        primary_key: product_category_name
+
+  - name: olist_marketing
+    type: file
+    provider: kaggle
+    slug: olistbr/marketing-funnel-olist
+    source_url: https://www.kaggle.com/datasets/olistbr/marketing-funnel-olist
+    domain: marketing
+    description: >
+      Olist Marketing Funnel Dataset - Nexora marketplace marketing channel.
+      ~8,000 leads. Links to olist via seller_id. Non-commercial (CC BY-NC-SA 4.0).
+    ingestion_mode: snapshot
+    local_path: data/source/olist_marketing/
+    bq_raw_dataset: raw_olist_marketing
+    license: CC BY-NC-SA 4.0
+    cross_dataset_links:
+      - target_source: olist
+        join_key: seller_id
+        join_target_table: olist_sellers
+    tables:
+      - name: olist_marketing_qualified_leads
+        source_file_pattern: olist_marketing_qualified_leads_dataset.csv
+        primary_key: mql_id
+        watermark_column: first_contact_date
+      - name: olist_closed_deals
+        source_file_pattern: olist_closed_deals_dataset.csv
+        primary_key: mql_id
+        watermark_column: won_date
+  - name: cloudflare_d1
+    type: database
+    provider: cloudflare_d1
+    engine: sqlite
+    domain: application
+    description: >
+      Cloudflare D1 - Nexora application-facing operational database.
+      Contains Organization, HR, CRM, Support, and Marketing event data.
+    ingestion_mode: snapshot
+    local_path: data/db/d1/nexora_app.sqlite
+    bq_raw_dataset: raw_d1
+    license: Internal Proprietary
+    tables:
+      - name: departments
+        source_file_pattern: "*.sqlite"
+        primary_key: department_id
+      - name: employees
+        source_file_pattern: "*.sqlite"
+        primary_key: employee_id
+      - name: employee_department_history
+        source_file_pattern: "*.sqlite"
+        primary_key: null
+      - name: employee_contact
+        source_file_pattern: "*.sqlite"
+        primary_key: employee_id
+      - name: customers
+        source_file_pattern: "*.sqlite"
+        primary_key: customer_id
+      - name: customer_contacts
+        source_file_pattern: "*.sqlite"
+        primary_key: contact_id
+      - name: customer_addresses
+        source_file_pattern: "*.sqlite"
+        primary_key: address_id
+      - name: leads
+        source_file_pattern: "*.sqlite"
+        primary_key: lead_id
+      - name: lead_events
+        source_file_pattern: "*.sqlite"
+        primary_key: event_id
+
+  - name: alloydb
+    type: database
+    provider: gcp_alloydb
+    engine: postgresql
+    domain: enterprise_erp
+    description: >
+      Google Cloud AlloyDB - Nexora core enterprise ERP database.
+      Contains Customer master, Product master, Sales orders, and Marketplace ERP.
+    ingestion_mode: snapshot
+    local_path: data/db/alloydb/nexora_erp.sqlite
+    bq_raw_dataset: raw_alloydb
+    license: Internal Proprietary
+    tables:
+      - name: product_categories
+        source_file_pattern: "*.sqlite"
+        primary_key: category_id
+      - name: product_subcategories
+        source_file_pattern: "*.sqlite"
+        primary_key: subcategory_id
+      - name: products
+        source_file_pattern: "*.sqlite"
+        primary_key: product_id
+      - name: customers
+        source_file_pattern: "*.sqlite"
+        primary_key: customer_id
+      - name: sales_representatives
+        source_file_pattern: "*.sqlite"
+        primary_key: sales_rep_id
+      - name: sales_territories
+        source_file_pattern: "*.sqlite"
+        primary_key: territory_id
+      - name: sales_orders
+        source_file_pattern: "*.sqlite"
+        primary_key: sales_order_id
+      - name: sales_order_items
+        source_file_pattern: "*.sqlite"
+        primary_key: sales_order_item_id
+      - name: marketplace_customers
+        source_file_pattern: "*.sqlite"
+        primary_key: customer_id
+      - name: marketplace_products
+        source_file_pattern: "*.sqlite"
+        primary_key: product_id
+      - name: marketplace_orders
+        source_file_pattern: "*.sqlite"
+        primary_key: order_id
+      - name: marketplace_order_items
+        source_file_pattern: "*.sqlite"
+        primary_key: null
+      - name: marketplace_payments
+        source_file_pattern: "*.sqlite"
+        primary_key: null
+      - name: marketplace_reviews
+        source_file_pattern: "*.sqlite"
+        primary_key: review_id
+
+  - name: aiven_mysql
+    type: database
+    provider: aiven
+    engine: mysql
+    domain: operations
+    description: >
+      Aiven MySQL - Nexora operational supply chain database.
+      Contains Suppliers, Procurement, Warehouses, Inventory, and Marketplace Logistics.
+    ingestion_mode: snapshot
+    local_path: data/db/aiven/nexora_ops.sqlite
+    bq_raw_dataset: raw_aiven_mysql
+    license: Internal Proprietary
+    tables:
+      - name: suppliers
+        source_file_pattern: "*.sqlite"
+        primary_key: supplier_id
+      - name: purchase_orders
+        source_file_pattern: "*.sqlite"
+        primary_key: purchase_order_id
+      - name: purchase_order_items
+        source_file_pattern: "*.sqlite"
+        primary_key: purchase_order_item_id
+      - name: inventory
+        source_file_pattern: "*.sqlite"
+        primary_key: inventory_id
+      - name: marketplace_sellers
+        source_file_pattern: "*.sqlite"
+        primary_key: seller_id
+      - name: geolocation
+        source_file_pattern: "*.sqlite"
+        primary_key: null
+

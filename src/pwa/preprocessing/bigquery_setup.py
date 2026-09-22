@@ -1,17 +1,29 @@
-import sys
+"""BigQuery infrastructure setup for the Nexora Technologies enterprise platform.
+
+Creates all 9 BigQuery datasets idempotently:
+  - raw_adventureworks       (raw enterprise ERP data)
+  - raw_olist                (raw marketplace data)
+  - raw_olist_marketing      (raw marketing funnel data)
+  - staging_enterprise       (normalized enterprise staging)
+  - staging_marketplace      (normalized marketplace staging)
+  - curated_enterprise       (canonical enterprise model)
+  - curated_marketplace      (canonical marketplace model)
+  - pwa_metadata             (control plane / audit log)
+  - rollup                   (materialized fast-path tables)
+
+Also sets up the warehouse-agent service account with least-privilege access
+(read-only on curated datasets only).
+
+Note: Cloud SQL PostgreSQL federation (EXTERNAL_QUERY) is removed from the
+primary pipeline. MySQL and PostgreSQL connections are preserved in
+connections.py for optional future use.
+"""
+
 import logging
 import subprocess
 
 from google.cloud import bigquery
-from google.cloud.bigquery_connection_v1 import ConnectionServiceClient
-from google.cloud.bigquery_connection_v1.types import (
-    Connection,
-    CloudSqlProperties,
-    CloudSqlCredential,
-    CreateConnectionRequest,
-    GetConnectionRequest,
-)
-from google.api_core.exceptions import NotFound, AlreadyExists
+from google.api_core.exceptions import NotFound
 
 from pwa.connections import get_bq_client
 from pwa.settings import get_settings
@@ -19,10 +31,16 @@ from pwa.settings import get_settings
 logger = logging.getLogger("pwa.bigquery_setup")
 
 
-def create_datasets(client, project, location):
-    """Create the 4 BQ datasets idempotently."""
+# ---------------------------------------------------------------------------
+# Dataset creation
+# ---------------------------------------------------------------------------
+
+
+def create_datasets(client: bigquery.Client, project: str, location: str) -> list[str]:
+    """Create all 9 Nexora enterprise BigQuery datasets idempotently."""
     s = get_settings()
-    dataset_ids = [s.bq_ds_registry, s.bq_ds_credits, s.bq_ds_files, s.bq_ds_mart]
+    dataset_ids = s.all_bq_datasets()
+
     for ds_id in dataset_ids:
         dataset_ref = bigquery.Dataset(f"{project}.{ds_id}")
         dataset_ref.location = location
@@ -32,129 +50,26 @@ def create_datasets(client, project, location):
         except Exception as e:
             logger.error(f"Failed to create dataset `{ds_id}`: {e}")
             raise
+
+    logger.info(f"All {len(dataset_ids)} datasets confirmed: {dataset_ids}")
     return dataset_ids
 
 
-def create_connection(project, location, connection_id, instance_conn_name, pg_db, pg_user, pg_password):
-    """Create a BigQuery connection to Cloud SQL PostgreSQL, or return existing."""
-    conn_client = ConnectionServiceClient()
-    parent = f"projects/{project}/locations/{location}"
-    full_name = f"{parent}/connections/{connection_id}"
-
-    try:
-        existing = conn_client.get_connection(GetConnectionRequest(name=full_name))
-        logger.info(f"BigQuery connection already exists: {full_name}")
-        return existing
-    except NotFound:
-        logger.info(f"No BigQuery connection at {full_name} yet; creating it.")
-
-    cloud_sql_props = CloudSqlProperties(
-        instance_id=instance_conn_name,
-        database=pg_db,
-        type_=CloudSqlProperties.DatabaseType.POSTGRES,
-        credential=CloudSqlCredential(username=pg_user, password=pg_password),
-    )
-    connection = Connection(cloud_sql=cloud_sql_props)
-
-    try:
-        created = conn_client.create_connection(
-            CreateConnectionRequest(
-                parent=parent,
-                connection_id=connection_id,
-                connection=connection,
-            )
-        )
-        logger.info(f"Created BigQuery connection: {created.name}")
-        return created
-    except AlreadyExists:
-        existing = conn_client.get_connection(GetConnectionRequest(name=full_name))
-        logger.info(f"BigQuery connection already exists: {full_name}")
-        return existing
+# ---------------------------------------------------------------------------
+# Service account setup
+# ---------------------------------------------------------------------------
 
 
-def grant_connection_service_agent(project, connection):
-    """Grant the connection's service agent roles/cloudsql.client on the project."""
-    sa_email = connection.cloud_sql.service_account_id
-    if not sa_email:
-        logger.warning("No service account found on connection; skipping IAM grant.")
-        return
+def setup_warehouse_agent_sa(project: str) -> str:
+    """Create warehouse-agent service account and grant least-privilege access.
 
-    logger.info(f"Connection service agent: {sa_email}")
-    logger.info(f"Granting roles/cloudsql.client to {sa_email} on project {project}...")
-
-    try:
-        subprocess.run(
-            [
-                "gcloud",
-                "projects",
-                "add-iam-policy-binding",
-                project,
-                f"--member=serviceAccount:{sa_email}",
-                "--role=roles/cloudsql.client",
-                "--condition=None",
-                "--quiet",
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-            shell=True,
-        )
-        logger.info(f"Granted roles/cloudsql.client to {sa_email}")
-    except subprocess.CalledProcessError as e:
-        logger.warning(f"IAM grant via gcloud failed (may already exist): {e.stderr}")
-    except FileNotFoundError:
-        logger.warning("gcloud CLI not found. Please grant roles/cloudsql.client manually:")
-        logger.warning(
-            f"  gcloud projects add-iam-policy-binding {project} "
-            f"--member=serviceAccount:{sa_email} --role=roles/cloudsql.client"
-        )
-
-
-def verify_connection(client, project, location, connection_id):
-    """Verify the BigQuery connection by running EXTERNAL_QUERY SELECT 1."""
-    conn_resource = f"{project}.{location}.{connection_id}"
-    query = f"""SELECT * FROM EXTERNAL_QUERY('{conn_resource}', 'SELECT 1 AS ok');"""
-
-    logger.info(f"Verifying connection with EXTERNAL_QUERY via {conn_resource}...")
-    job_config = bigquery.QueryJobConfig(maximum_bytes_billed=100_000_000)
-    try:
-        result = client.query(query, job_config=job_config).result()
-        rows = list(result)
-        if len(rows) == 0 or rows[0]["ok"] != 1:
-            logger.error("Connection verification failed: EXTERNAL_QUERY returned no rows or unexpected result.")
-            sys.exit(1)
-        logger.info("Connection verification PASSED: EXTERNAL_QUERY returned ok=1")
-    except Exception as e:
-        logger.error(f"Connection verification FAILED: {e}")
-        sys.exit(1)
-
-
-def create_federated_view(client, project, location, connection_id):
-    """Create the federated view for raw_credits.movie_credits."""
-    ds_credits = get_settings().bq_ds_credits
-    conn_resource = f"{project}.{location}.{connection_id}"
-
-    view_sql = f"""
-CREATE OR REPLACE VIEW `{project}.{ds_credits}.movie_credits` AS
-SELECT * FROM EXTERNAL_QUERY(
-  '{conn_resource}',
-  '''SELECT credit_id, movie_id, director_name, director_gender,
-            lead_actor_name, second_actor_name, lead_actor_gender,
-            cast_size, crew_size, producer_name
-     FROM movie_credits'''
-);
-"""
-    logger.info(f"Creating federated view `{ds_credits}.movie_credits`...")
-    job_config = bigquery.QueryJobConfig(maximum_bytes_billed=100_000_000)
-    client.query(view_sql, job_config=job_config).result()
-    logger.info(f"Federated view `{ds_credits}.movie_credits` created.")
-
-
-def setup_warehouse_agent_sa(project):
-    """Create warehouse-agent service account and grant minimal permissions."""
+    The agent SA gets:
+    - roles/bigquery.jobUser on the project (to run queries)
+    - roles/bigquery.dataViewer on curated datasets only (not raw/staging)
+    """
+    s = get_settings()
     sa_name = "warehouse-agent"
     sa_email = f"{sa_name}@{project}.iam.gserviceaccount.com"
-    ds_mart = get_settings().bq_ds_mart
 
     try:
         subprocess.run(
@@ -165,7 +80,7 @@ def setup_warehouse_agent_sa(project):
                 "create",
                 sa_name,
                 f"--project={project}",
-                "--display-name=Warehouse Agent SA",
+                "--display-name=Nexora Warehouse Agent SA",
                 "--quiet",
             ],
             check=True,
@@ -180,6 +95,7 @@ def setup_warehouse_agent_sa(project):
         else:
             logger.warning(f"SA creation warning: {e.stderr}")
 
+    # Grant bigquery.jobUser at project level
     try:
         subprocess.run(
             [
@@ -201,9 +117,18 @@ def setup_warehouse_agent_sa(project):
     except subprocess.CalledProcessError as e:
         logger.warning(f"IAM binding warning: {e.stderr}")
 
+    # Grant dataViewer only on curated datasets (not raw or staging)
+    client = get_bq_client()
+    for ds_id in s.curated_datasets():
+        _grant_dataset_viewer(client, project, ds_id, sa_email)
+
+    return sa_email
+
+
+def _grant_dataset_viewer(client: bigquery.Client, project: str, ds_id: str, sa_email: str) -> None:
+    """Grant bigquery.dataViewer role on one dataset to a service account email."""
     try:
-        client = get_bq_client()
-        dataset_ref = client.get_dataset(f"{project}.{ds_mart}")
+        dataset_ref = client.get_dataset(f"{project}.{ds_id}")
         access_entries = list(dataset_ref.access_entries)
         exists = any(e.role == "roles/bigquery.dataViewer" and e.entity_id == sa_email for e in access_entries)
         if not exists:
@@ -216,102 +141,131 @@ def setup_warehouse_agent_sa(project):
             )
             dataset_ref.access_entries = access_entries
             client.update_dataset(dataset_ref, ["access_entries"])
-        logger.info(f"Granted roles/bigquery.dataViewer on {ds_mart} to {sa_email}")
+            logger.info(f"Granted roles/bigquery.dataViewer on `{ds_id}` to {sa_email}")
+        else:
+            logger.info(f"dataViewer already granted on `{ds_id}` to {sa_email}")
     except Exception as e:
-        logger.warning(f"Dataset IAM binding warning: {e}")
-
-    return sa_email
+        logger.warning(f"Dataset IAM binding warning for `{ds_id}`: {e}")
 
 
-def authorize_mart_views(client, project):
-    """Authorize each mart view on each raw_* dataset so cross-dataset queries work."""
+# ---------------------------------------------------------------------------
+# View authorization (curated views reading from raw/staging)
+# ---------------------------------------------------------------------------
+
+
+def authorize_curated_views(client: bigquery.Client, project: str) -> None:
+    """Authorize curated views to read from raw and staging datasets.
+
+    BigQuery requires explicit view authorization when a view in dataset A
+    queries tables in dataset B that belong to a different dataset.
+    """
     s = get_settings()
-    ds_mart = s.bq_ds_mart
-    raw_datasets = [s.bq_ds_registry, s.bq_ds_credits, s.bq_ds_files]
-    mart_views = [
-        "v_movie",
-        "v_movie_credits",
-        "v_movie_full",
-        "v_movie_keywords",
-        "v_integrity_exceptions",
+    ds_curated_ent = s.bq_ds_curated_ent
+    ds_curated_mkt = s.bq_ds_curated_mkt
+
+    # Enterprise curated views need to read from raw_adventureworks + staging_enterprise
+    enterprise_source_datasets = [s.bq_ds_raw_aw, s.bq_ds_staging_ent]
+    # Marketplace curated views need to read from raw_olist + raw_olist_marketing + staging_marketplace
+    marketplace_source_datasets = [s.bq_ds_raw_olist, s.bq_ds_raw_marketing, s.bq_ds_staging_mkt]
+
+    view_dataset_pairs = [
+        (ds_curated_ent, enterprise_source_datasets),
+        (ds_curated_mkt, marketplace_source_datasets),
     ]
 
-    for raw_ds_id in raw_datasets:
-        dataset_ref = client.get_dataset(f"{project}.{raw_ds_id}")
-        access_entries = list(dataset_ref.access_entries)
-        existing_views = {
-            (e.entity_id.get("projectId"), e.entity_id.get("datasetId"), e.entity_id.get("tableId"))
-            for e in access_entries
-            if e.entity_type == "view" and e.entity_id
-        }
+    for view_ds_id, source_ds_ids in view_dataset_pairs:
+        # Get all views in this curated dataset
+        try:
+            tables = list(client.list_tables(f"{project}.{view_ds_id}"))
+            view_names = [t.table_id for t in tables if t.table_type == "VIEW"]
+        except Exception as e:
+            logger.warning(f"Could not list views in `{view_ds_id}`: {e}")
+            view_names = []
 
-        added = 0
-        for view_name in mart_views:
-            try:
-                client.get_table(f"{project}.{ds_mart}.{view_name}")
-            except NotFound:
-                logger.info(f"Skipping authorization for `{ds_mart}.{view_name}` (view not created yet)")
-                continue
+        if not view_names:
+            logger.info(f"No views found in `{view_ds_id}` yet — skipping authorization.")
+            continue
 
-            view_ref = {"projectId": project, "datasetId": ds_mart, "tableId": view_name}
-            key = (project, ds_mart, view_name)
-            if key not in existing_views:
-                access_entries.append(
-                    bigquery.AccessEntry(
-                        role=None,
-                        entity_type="view",
-                        entity_id=view_ref,
-                    )
+        for src_ds_id in source_ds_ids:
+            _authorize_views_on_dataset(client, project, view_ds_id, view_names, src_ds_id)
+
+
+def _authorize_views_on_dataset(
+    client: bigquery.Client,
+    project: str,
+    view_ds_id: str,
+    view_names: list[str],
+    source_ds_id: str,
+) -> None:
+    """Authorize a list of views from view_ds_id to read source_ds_id."""
+    try:
+        dataset_ref = client.get_dataset(f"{project}.{source_ds_id}")
+    except NotFound:
+        logger.warning(f"Source dataset `{source_ds_id}` not found; skipping authorization.")
+        return
+
+    access_entries = list(dataset_ref.access_entries)
+    existing_views = {
+        (e.entity_id.get("projectId"), e.entity_id.get("datasetId"), e.entity_id.get("tableId"))
+        for e in access_entries
+        if e.entity_type == "view" and e.entity_id
+    }
+
+    added = 0
+    for view_name in view_names:
+        try:
+            client.get_table(f"{project}.{view_ds_id}.{view_name}")
+        except NotFound:
+            logger.info(f"Skipping authorization for `{view_ds_id}.{view_name}` (not created yet)")
+            continue
+
+        key = (project, view_ds_id, view_name)
+        if key not in existing_views:
+            access_entries.append(
+                bigquery.AccessEntry(
+                    role=None,
+                    entity_type="view",
+                    entity_id={"projectId": project, "datasetId": view_ds_id, "tableId": view_name},
                 )
-                added += 1
+            )
+            added += 1
 
-        if added > 0:
-            dataset_ref.access_entries = access_entries
-            client.update_dataset(dataset_ref, ["access_entries"])
-            logger.info(f"Authorized {added} mart views on `{raw_ds_id}`")
-        else:
-            logger.info(f"All existing mart views already authorized on `{raw_ds_id}`")
+    if added > 0:
+        dataset_ref.access_entries = access_entries
+        client.update_dataset(dataset_ref, ["access_entries"])
+        logger.info(f"Authorized {added} curated view(s) on `{source_ds_id}`")
+    else:
+        logger.info(f"All curated views already authorized on `{source_ds_id}`")
 
 
-def run_setup():
-    """Run the full BigQuery setup: datasets, connection, IAM, federated view, authorized views."""
+# ---------------------------------------------------------------------------
+# Main setup entry point
+# ---------------------------------------------------------------------------
+
+
+def run_setup() -> bool:
+    """Run the full BigQuery infrastructure setup for Nexora enterprise platform."""
     s = get_settings()
     project = s.gcp_project
     location = s.bq_location
-    connection_id = s.bq_connection_id
-    instance_conn_name = s.pg_instance_connection_name
-    pg_db = s.pg_db
-    pg_bq_user = s.pg_bq_reader_user
-    pg_bq_password = s.pg_bq_reader_password
 
     client = get_bq_client()
 
-    logger.info("=== STEP 1: CREATE BIGQUERY DATASETS ===")
+    logger.info("=== STEP 1: CREATE ALL BIGQUERY DATASETS ===")
     create_datasets(client, project, location)
 
-    logger.info("=== STEP 1: CREATE BIGQUERY CONNECTION ===")
-    connection = create_connection(
-        project, location, connection_id, instance_conn_name, pg_db, pg_bq_user, pg_bq_password
-    )
-
-    logger.info("=== STEP 1: GRANT CONNECTION SERVICE AGENT IAM ===")
-    grant_connection_service_agent(project, connection)
-
-    logger.info("=== STEP 1: VERIFY CONNECTION ===")
-    verify_connection(client, project, location, connection_id)
-
-    logger.info("=== STEP 1: CREATE FEDERATED VIEW ===")
-    create_federated_view(client, project, location, connection_id)
-
-    logger.info("=== STEP 4: SETUP WAREHOUSE AGENT SERVICE ACCOUNT ===")
+    logger.info("=== STEP 2: SETUP WAREHOUSE AGENT SERVICE ACCOUNT ===")
     setup_warehouse_agent_sa(project)
 
-    logger.info("=== STEP 4: AUTHORIZE MART VIEWS ON RAW DATASETS ===")
-    authorize_mart_views(client, project)
+    logger.info("=== STEP 3: AUTHORIZE CURATED VIEWS ON SOURCE DATASETS ===")
+    authorize_curated_views(client, project)
 
-    logger.info("=== BIGQUERY SETUP COMPLETE ===")
+    logger.info("=== BIGQUERY INFRASTRUCTURE SETUP COMPLETE ===")
     return True
 
 
 if __name__ == "__main__":
-    run_setup()
+    from pwa.logging_setup import setup_logging
+
+    setup_logging()
+    raise SystemExit(0 if run_setup() else 1)

@@ -63,17 +63,25 @@ def _cache_file(project_id: str, dataset: str) -> pathlib.Path:
 # ---------------------------------------------------------------------------
 # Relationship Cardinalities relative to v_movie
 # ---------------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# Relationship Cardinalities relative to core enterprise domains
+# ---------------------------------------------------------------------------
 MART_CARDINALITIES: dict[str, str] = {
-    "mart.v_movie": "base (1 row per movie)",
-    "mart.v_movie_credits": "one-to-one (safe to pre-join, row count stays 1:1)",
-    "mart.v_movie_keywords": "one-to-many (JOIN only for keyword filtering; NEVER join before an aggregate like AVG/SUM over movie-level columns, or wrap the join in a pre-aggregation subquery first)",
-    "mart.v_movie_full": "pre-joined 1:1 view, safe for direct lookups",
-    "mart.v_integrity_exceptions": "monitor (exceptions listing)",
+    "mart.v_sales_order_line": "base (1 row per sales order line item)",
+    "mart.v_product_catalog": "base (1 row per product SKU)",
+    "mart.v_customer_360": "base (1 row per customer across channels)",
+    "mart.v_employee_directory": "base (1 row per employee)",
+    "mart.v_supplier_performance": "base (1 row per vendor/supplier)",
+    "mart.v_marketplace_order_summary": "base (1 row per Olist marketplace order)",
+    "mart.v_marketplace_delivery_performance": "one-to-one with order summary (delivery SLA metrics)",
+    "mart.v_marketplace_review_sentiment": "one-to-one/many with marketplace order (customer feedback & ratings)",
+    "mart.v_marketplace_marketing_funnel": "base (1 row per qualified marketing lead)",
+    "mart.v_integrity_exceptions": "monitor (warehouse cross-domain quality exceptions)",
 }
 
 
 def get_view_cardinality(view_name: str) -> str:
-    """Return the relationship cardinality description relative to v_movie."""
+    """Return the relationship cardinality description relative to enterprise domains."""
     clean = view_name.strip().strip("`").lower()
     if not clean.startswith("mart."):
         clean = f"mart.{clean}"
@@ -82,57 +90,96 @@ def get_view_cardinality(view_name: str) -> str:
 
 # ---------------------------------------------------------------------------
 # Static schema — used as immediate fallback when live fetch fails.
-# Keep in sync with your actual mart views.
+# Keep in sync with your actual enterprise mart views.
 # ---------------------------------------------------------------------------
 STATIC_MART_SCHEMA: dict[str, list[dict[str, Any]]] = {
-    "mart.v_movie": [
-        {"name": "movie_id", "type": "INT64", "description": "Primary key"},
-        {"name": "title", "type": "STRING", "description": "Movie title"},
-        {"name": "budget_usd", "type": "FLOAT64", "description": "Production budget in USD (may be 0 for old films)"},
-        {"name": "revenue_usd", "type": "FLOAT64", "description": "Box office revenue in USD"},
-        {"name": "profit_usd", "type": "FLOAT64", "description": "Profit in USD (revenue minus budget)"},
-        {
-            "name": "roi",
-            "type": "FLOAT64",
-            "description": "Return on Investment ratio (revenue/budget - 1). Unreliable when budget_usd < 1000 — always filter with WHERE budget_usd > 1000 for ROI queries.",
-        },
-        {"name": "primary_genre", "type": "STRING", "description": "Primary genre"},
-        {"name": "release_year", "type": "INT64", "description": "Year of release"},
-        {"name": "vote_average", "type": "FLOAT64", "description": "Average TMDB user rating"},
+    "mart.v_sales_order_line": [
+        {"name": "sales_order_id", "type": "INT64", "description": "Sales order ID"},
+        {"name": "sales_order_detail_id", "type": "INT64", "description": "Order line item detail ID"},
+        {"name": "order_date", "type": "DATE", "description": "Order placement date"},
+        {"name": "order_year", "type": "INT64", "description": "Year of order"},
+        {"name": "customer_id", "type": "INT64", "description": "Customer ID"},
+        {"name": "product_id", "type": "INT64", "description": "Product ID"},
+        {"name": "order_qty", "type": "INT64", "description": "Quantity ordered"},
+        {"name": "unit_price_usd", "type": "FLOAT64", "description": "Unit price in USD"},
+        {"name": "unit_price_discount", "type": "FLOAT64", "description": "Unit price discount percentage"},
+        {"name": "line_total_usd", "type": "FLOAT64", "description": "Line total amount in USD"},
     ],
-    "mart.v_movie_credits": [
-        {"name": "movie_id", "type": "INT64", "description": "Foreign key to v_movie"},
-        {"name": "director_name", "type": "STRING", "description": "Director name"},
-        {"name": "lead_actor_name", "type": "STRING", "description": "Lead actor name"},
-        {"name": "second_actor_name", "type": "STRING", "description": "Secondary actor"},
-        {"name": "cast_size", "type": "INT64", "description": "Total cast members"},
-        {"name": "crew_size", "type": "INT64", "description": "Total crew members"},
+    "mart.v_product_catalog": [
+        {"name": "product_id", "type": "INT64", "description": "Primary key"},
+        {"name": "product_name", "type": "STRING", "description": "Product name"},
+        {"name": "product_number", "type": "STRING", "description": "Product SKU code"},
+        {"name": "category_name", "type": "STRING", "description": "Product category"},
+        {"name": "subcategory_name", "type": "STRING", "description": "Product subcategory"},
+        {"name": "standard_cost_usd", "type": "FLOAT64", "description": "Standard manufacturing cost"},
+        {"name": "list_price_usd", "type": "FLOAT64", "description": "List price"},
     ],
-    "mart.v_movie_keywords": [
-        {"name": "movie_id", "type": "INT64", "description": "Foreign key"},
-        {"name": "keyword_id", "type": "INT64", "description": "Keyword ID"},
-        {"name": "keyword", "type": "STRING", "description": "Keyword label"},
+    "mart.v_customer_360": [
+        {"name": "customer_id", "type": "STRING", "description": "Unified customer key"},
+        {"name": "source_system", "type": "STRING", "description": "Source dataset (AdventureWorks or Olist)"},
+        {"name": "customer_name", "type": "STRING", "description": "Customer name"},
+        {"name": "city", "type": "STRING", "description": "City"},
+        {"name": "state_province", "type": "STRING", "description": "State or province"},
+        {"name": "country_region", "type": "STRING", "description": "Country or region"},
+        {"name": "total_orders", "type": "INT64", "description": "Lifetime order count"},
+        {"name": "total_spend_usd", "type": "FLOAT64", "description": "Lifetime total spend in USD"},
     ],
-    "mart.v_movie_full": [
-        {"name": "movie_id", "type": "INT64", "description": "Primary key"},
-        {"name": "title", "type": "STRING", "description": "Movie title"},
-        {"name": "release_year", "type": "INT64", "description": "Release year"},
-        {"name": "revenue_usd", "type": "FLOAT64", "description": "Revenue"},
-        {"name": "profit_usd", "type": "FLOAT64", "description": "Profit"},
-        {
-            "name": "roi",
-            "type": "FLOAT64",
-            "description": "ROI — filter budget_usd > 1000 to avoid silent-era division-by-zero artifacts",
-        },
-        {"name": "primary_genre", "type": "STRING", "description": "Primary genre"},
-        {"name": "vote_average", "type": "FLOAT64", "description": "Average rating"},
-        {"name": "director_name", "type": "STRING", "description": "Director name"},
-        {"name": "lead_actor_name", "type": "STRING", "description": "Lead actor"},
+    "mart.v_employee_directory": [
+        {"name": "business_entity_id", "type": "INT64", "description": "Employee ID"},
+        {"name": "job_title", "type": "STRING", "description": "Job title"},
+        {"name": "department_name", "type": "STRING", "description": "Department name"},
+        {"name": "hire_date", "type": "DATE", "description": "Hire date"},
+        {"name": "hire_year", "type": "INT64", "description": "Hire year"},
+        {"name": "gender", "type": "STRING", "description": "Gender"},
+        {"name": "salaried_flag", "type": "BOOL", "description": "Salaried employee flag"},
+    ],
+    "mart.v_supplier_performance": [
+        {"name": "vendor_id", "type": "INT64", "description": "Supplier vendor ID"},
+        {"name": "vendor_name", "type": "STRING", "description": "Supplier vendor name"},
+        {"name": "account_number", "type": "STRING", "description": "Supplier account number"},
+        {"name": "credit_rating", "type": "INT64", "description": "Credit rating (1-5)"},
+        {"name": "active_flag", "type": "BOOL", "description": "Active supplier flag"},
+        {"name": "purchase_order_count", "type": "INT64", "description": "Total purchase orders placed"},
+        {"name": "total_purchase_usd", "type": "FLOAT64", "description": "Total purchase volume in USD"},
+    ],
+    "mart.v_marketplace_order_summary": [
+        {"name": "order_id", "type": "STRING", "description": "Olist order ID"},
+        {"name": "customer_id", "type": "STRING", "description": "Customer ID"},
+        {"name": "order_status", "type": "STRING", "description": "Order status"},
+        {"name": "order_purchase_timestamp", "type": "TIMESTAMP", "description": "Purchase timestamp"},
+        {"name": "purchase_year", "type": "INT64", "description": "Purchase year"},
+        {"name": "payment_value_usd", "type": "FLOAT64", "description": "Total payment value in USD"},
+        {"name": "payment_type", "type": "STRING", "description": "Primary payment type"},
+    ],
+    "mart.v_marketplace_delivery_performance": [
+        {"name": "order_id", "type": "STRING", "description": "Olist order ID"},
+        {"name": "order_purchase_timestamp", "type": "TIMESTAMP", "description": "Order purchase timestamp"},
+        {"name": "delivered_customer_date", "type": "TIMESTAMP", "description": "Actual delivery timestamp"},
+        {"name": "estimated_delivery_date", "type": "TIMESTAMP", "description": "Estimated delivery timestamp"},
+        {"name": "delivery_days", "type": "FLOAT64", "description": "Actual delivery time in days"},
+        {"name": "is_late_delivery", "type": "BOOL", "description": "True if actual delivery past estimated date"},
+    ],
+    "mart.v_marketplace_review_sentiment": [
+        {"name": "review_id", "type": "STRING", "description": "Review ID"},
+        {"name": "order_id", "type": "STRING", "description": "Order ID"},
+        {"name": "review_score", "type": "INT64", "description": "Star rating (1-5)"},
+        {"name": "review_comment_title", "type": "STRING", "description": "Review comment title"},
+        {"name": "review_creation_date", "type": "TIMESTAMP", "description": "Review submission timestamp"},
+    ],
+    "mart.v_marketplace_marketing_funnel": [
+        {"name": "mql_id", "type": "STRING", "description": "Marketing Qualified Lead ID"},
+        {"name": "first_contact_date", "type": "DATE", "description": "First contact date"},
+        {"name": "landing_page_id", "type": "STRING", "description": "Landing page ID"},
+        {"name": "origin", "type": "STRING", "description": "Marketing origin channel"},
+        {"name": "is_won", "type": "BOOL", "description": "True if lead converted to seller"},
+        {"name": "declared_monthly_revenue", "type": "FLOAT64", "description": "Declared monthly revenue USD"},
     ],
     "mart.v_integrity_exceptions": [
         {"name": "exception_id", "type": "STRING", "description": "Exception ID"},
-        {"name": "rule_name", "type": "STRING", "description": "Failed rule"},
-        {"name": "severity", "type": "STRING", "description": "Severity"},
+        {"name": "rule_name", "type": "STRING", "description": "Failed data quality rule name"},
+        {"name": "severity", "type": "STRING", "description": "Severity level (CRITICAL, HIGH, MEDIUM, LOW)"},
+        {"name": "domain", "type": "STRING", "description": "Domain area"},
+        {"name": "description", "type": "STRING", "description": "Exception detail"},
     ],
 }
 

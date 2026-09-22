@@ -1,0 +1,131 @@
+# Governed Raw Measures Configuration for Nexora Technologies
+
+measures:
+  revenue:
+    name: "revenue"
+    display_name: "Sales Revenue"
+    description: "Total revenue amount from sales transactions"
+    entity: "fact_sales_order"
+    column: "total_due"
+    aggregation: "SUM"
+    data_type: "NUMERIC"
+    currency: "USD"
+
+  order_count:
+    name: "order_count"
+    display_name: "Sales Order Count"
+    description: "Total number of sales order transactions"
+    entity: "fact_sales_order"
+    column: "sales_order_id"
+    aggregation: "COUNT"
+    data_type: "INTEGER"
+    unit: "orders"
+
+  quantity_sold:
+    name: "quantity_sold"
+    display_name: "Quantity Sold"
+    description: "Total number of line item product units sold"
+    entity: "fact_sales_order_item"
+    column: "order_qty"
+    aggregation: "SUM"
+    data_type: "INTEGER"
+    unit: "units"
+
+  purchase_amount:
+    name: "purchase_amount"
+    display_name: "Procurement Total"
+    description: "Total purchase order financial amount committed to suppliers"
+    entity: "fact_purchase_order"
+    column: "total_due"
+    aggregation: "SUM"
+    data_type: "NUMERIC"
+    currency: "USD"
+
+  purchase_order_count:
+    name: "purchase_order_count"
+    display_name: "Purchase Order Count"
+    description: "Total number of procurement purchase orders"
+    entity: "fact_purchase_order"
+    column: "purchase_order_id"
+    aggregation: "COUNT"
+    data_type: "INTEGER"
+    unit: "orders"
+
+  inventory_quantity:
+    name: "inventory_quantity"
+    display_name: "Inventory On Hand"
+    description: "Total quantity of product stock on hand in warehouses"
+    entity: "fact_inventory"
+    column: "quantity"
+    aggregation: "SUM"
+    data_type: "INTEGER"
+    unit: "units"
+
+  customer_count:
+    name: "customer_count"
+    display_name: "Total Customers"
+    description: "Total number of distinct enterprise customers"
+    entity: "dim_customer"
+    column: "enterprise_customer_id"
+    aggregation: "COUNT"
+    data_type: "INTEGER"
+    unit: "customers"
+
+  lead_count:
+    name: "lead_count"
+    display_name: "Marketing Lead Count"
+    description: "Total count of qualified marketing leads"
+    entity: "dim_lead"
+    column: "mql_id"
+    aggregation: "COUNT"
+    data_type: "INTEGER"
+    unit: "leads"
+
+  declared_monthly_revenue:
+    name: "declared_monthly_revenue"
+    display_name: "Declared Monthly Revenue"
+    description: "Average declared monthly revenue for closed deal sellers"
+    entity: "fact_closed_deal"
+    column: "declared_monthly_revenue"
+    aggregation: "AVG"
+    data_type: "NUMERIC"
+    currency: "USD"
+
+  payment_amount:
+    name: "payment_amount"
+    display_name: "Payment Amount"
+    description: "Total payment amount from marketplace orders"
+    entity: "fact_marketplace_payment"
+    column: "payment_amount"
+    aggregation: "SUM"
+    data_type: "NUMERIC"
+    currency: "BRL"
+
+  payment_installments:
+    name: "payment_installments"
+    display_name: "Payment Installments"
+    description: "Average payment installments per transaction"
+    entity: "fact_marketplace_payment"
+    column: "payment_installments"
+    aggregation: "AVG"
+    data_type: "NUMERIC"
+
+  review_score:
+    name: "review_score"
+    display_name: "Review Score"
+    description: "Average customer review score"
+    entity: "fact_marketplace_review"
+    column: "review_score"
+    aggregation: "AVG"
+    data_type: "NUMERIC"
+
+  freight:
+    name: "freight"
+    display_name: "Freight Cost"
+    description: "Total shipping freight amount"
+    entity: "fact_sales_order"
+    column: "freight"
+    aggregation: "SUM"
+    data_type: "NUMERIC"
+    currency: "USD"
+

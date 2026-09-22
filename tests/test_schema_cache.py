@@ -24,8 +24,8 @@ def clear_cache():
 
 def _make_mock_snapshot():
     return {
-        "mart.v_movie": [{"name": "movie_id", "type": "INTEGER", "description": "ID"}],
-        "mart.v_movie_credits": [],
+        "mart.v_sales_order_line": [{"name": "sales_order_id", "type": "INTEGER", "description": "ID"}],
+        "mart.v_product_catalog": [],
     }
 
 
@@ -124,16 +124,14 @@ class TestCardinalityAnnotations:
     def test_cardinality_mappings_exist(self):
         """All mart views must have explicit cardinality annotations."""
         expected_views = [
-            "mart.v_movie",
-            "mart.v_movie_credits",
-            "mart.v_movie_keywords",
-            "mart.v_movie_full",
+            "mart.v_sales_order_line",
+            "mart.v_product_catalog",
+            "mart.v_customer_360",
+            "mart.v_employee_directory",
+            "mart.v_supplier_performance",
+            "mart.v_marketplace_order_summary",
             "mart.v_integrity_exceptions",
         ]
         for v in expected_views:
             assert v in sc.MART_CARDINALITIES
             assert sc.get_view_cardinality(v) != "unknown"
-
-    def test_keywords_cardinality_is_one_to_many(self):
-        card = sc.get_view_cardinality("mart.v_movie_keywords")
-        assert "one-to-many" in card

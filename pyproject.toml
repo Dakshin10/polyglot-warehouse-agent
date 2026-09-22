@@ -26,13 +26,24 @@ dependencies = [
     "sqlglot",
     "kaggle",
     "streamlit",
+    "requests",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
     "ruff>=0.3.0",
     "mypy>=1.8.0",
+]
+observability = [
+    "opentelemetry-exporter-otlp-proto-http",
+]
+cache = [
+    "redis",
+]
+orchestration = [
+    "dagster",
 ]
 
 [project.scripts]

@@ -1,5 +1,19 @@
-import sys
+"""Generic MySQL → BigQuery table replication utility — Nexora Enterprise Platform.
+
+PRESERVED AS GENERIC INFRASTRUCTURE:
+This module provides generic MySQL table replication. The movie-specific schema
+(BQ_SCHEMA_MOVIE) and movie table hardcoding have been removed.
+
+For the primary enterprise pipeline, use the ingest modules instead:
+  adventureworks_ingest.py  (Kaggle Excel → raw_adventureworks.*)
+  olist_ingest.py           (Kaggle CSV → raw_olist.*)
+  olist_marketing_ingest.py (Kaggle CSV → raw_olist_marketing.*)
+
+This module can be used for live MySQL sources in future integrations.
+"""
+
 import logging
+from typing import Optional
 
 import pandas as pd
 from google.cloud import bigquery
@@ -9,67 +23,94 @@ from pwa.settings import get_settings
 
 logger = logging.getLogger("pwa.bigquery_replicate")
 
-BQ_SCHEMA_MOVIE = [
-    bigquery.SchemaField("movie_id", "INT64", mode="REQUIRED"),
-    bigquery.SchemaField("title", "STRING"),
-    bigquery.SchemaField("original_title", "STRING"),
-    bigquery.SchemaField("original_language", "STRING"),
-    bigquery.SchemaField("release_date", "DATE"),
-    bigquery.SchemaField("release_year", "INT64"),
-    bigquery.SchemaField("runtime_min", "INT64"),
-    bigquery.SchemaField("budget_usd", "INT64"),
-    bigquery.SchemaField("revenue_usd", "INT64"),
-    bigquery.SchemaField("primary_genre", "STRING"),
-    bigquery.SchemaField("production_country", "STRING"),
-    bigquery.SchemaField("vote_average", "NUMERIC"),
-    bigquery.SchemaField("vote_count", "INT64"),
-    bigquery.SchemaField("popularity", "NUMERIC"),
-]
 
+def replicate_mysql_table(
+    source_table: str,
+    target_dataset: str,
+    target_table: Optional[str] = None,
+    schema: Optional[list] = None,
+    sql: Optional[str] = None,
+) -> int:
+    """Replicate a MySQL table (or query result) to a BigQuery table.
 
-def replicate_mysql():
-    """Read movie table from Aiven MySQL and load into BigQuery raw_registry.movie."""
-    settings = get_settings()
-    project = settings.gcp_project
-    ds_registry = settings.bq_ds_registry
+    Args:
+        source_table:   MySQL table name (used as default SQL if sql not provided).
+        target_dataset: BigQuery dataset ID.
+        target_table:   BigQuery table name (defaults to source_table).
+        schema:         Explicit BigQuery schema field list. If None, autodetect.
+        sql:            Custom SQL to execute on MySQL (defaults to SELECT * FROM source_table).
 
-    logger.info("Reading movie table from Aiven MySQL via get_mysql_engine()...")
+    Returns:
+        Number of rows written to BigQuery.
+    """
+    s = get_settings()
+    project = s.gcp_project
+
+    if not s.mysql_enabled:
+        raise RuntimeError(
+            "MySQL is not configured (MYSQL_HOST and MYSQL_PASSWORD are required). "
+            "Set them in .env to use MySQL replication."
+        )
+
     mysql_engine, mysql_type = get_mysql_engine()
-    df = pd.read_sql("SELECT * FROM movie", con=mysql_engine)
-    logger.info(f"Read {len(df)} rows from MySQL ({mysql_type})")
+    query = sql or f"SELECT * FROM {source_table}"
 
-    if len(df) == 0:
-        logger.error("MySQL movie table returned 0 rows. Cannot replicate.")
-        sys.exit(1)
+    logger.info(f"Reading from MySQL ({mysql_type}): {query}")
+    df = pd.read_sql(query, con=mysql_engine)
+    logger.info(f"Read {len(df):,} rows from MySQL table '{source_table}'")
 
-    records = df.to_dict(orient="records")
-    for r in records:
-        if r.get("release_date") is not None and pd.notna(r["release_date"]):
-            r["release_date"] = str(r["release_date"])
-        else:
-            r["release_date"] = None
+    if df.empty:
+        logger.error(f"MySQL table '{source_table}' returned 0 rows.")
+        return 0
 
-    table_id = f"{project}.{ds_registry}.movie"
+    bq_table_name = target_table or source_table
+    table_id = f"{project}.{target_dataset}.{bq_table_name}"
     client = get_bq_client()
 
+    records = df.to_dict(orient="records")
+    # Convert date-like values to ISO string for JSON serialization
+    for r in records:
+        for k, v in r.items():
+            if hasattr(v, "isoformat"):
+                r[k] = v.isoformat() if v is not None else None
+
     job_config = bigquery.LoadJobConfig(
-        schema=BQ_SCHEMA_MOVIE,
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
     )
+    if schema:
+        job_config.schema = schema
+    else:
+        job_config.autodetect = True
 
-    logger.info(f"Loading {len(records)} rows into BigQuery `{table_id}` (WRITE_TRUNCATE)...")
+    logger.info(f"Loading {len(records):,} rows → `{table_id}` (WRITE_TRUNCATE)...")
     job = client.load_table_from_json(records, table_id, job_config=job_config)
     job.result()
 
-    table = client.get_table(table_id)
-    logger.info(f"BigQuery reported row count for `{table_id}`: {table.num_rows}")
+    final_count = client.get_table(table_id).num_rows
+    logger.info(f"BigQuery `{table_id}` row count: {final_count:,}")
+    return final_count
 
-    if table.num_rows != 1000:
-        logger.warning(f"Expected 1000 rows but BigQuery reports {table.num_rows}")
 
-    logger.info("=== MYSQL REPLICATION TO BIGQUERY COMPLETE ===")
-    return table.num_rows
+def replicate_mysql() -> int:
+    """Deprecated stub — MySQL replication is not used in the primary enterprise pipeline.
+
+    Preserved for backward compatibility. The enterprise pipeline uses direct
+    Kaggle-to-BigQuery ingestion (adventureworks_ingest, olist_ingest, olist_marketing_ingest).
+
+    Returns 0. Does not raise.
+    """
+    logger.warning(
+        "replicate_mysql() called but is not part of the primary enterprise pipeline. "
+        "Use adventureworks_ingest, olist_ingest, or olist_marketing_ingest instead."
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    replicate_mysql()
+    from pwa.logging_setup import setup_logging
+
+    setup_logging()
+    logger.info(
+        "bigquery_replicate.py: generic MySQL→BigQuery utility. "
+        "Use adventureworks_ingest / olist_ingest / olist_marketing_ingest for enterprise ingestion."
+    )
