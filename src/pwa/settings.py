@@ -15,6 +15,12 @@ from pathlib import Path
 from dataclasses import dataclass, fields
 from dotenv import load_dotenv
 
+import logging
+from abc import ABC, abstractmethod
+from typing import Any
+
+logger = logging.getLogger("pwa.settings")
+
 SECRET_FIELD_MARKERS = ("password", "key", "secret", "token")
 
 _SQLITE_TARGET = re.compile(r"^sqlite(\+\w+)?://|\.( db|sqlite|sqlite3)$", re.IGNORECASE)
@@ -27,6 +33,56 @@ class ProductionEnvironmentError(RuntimeError):
     """Raised when production environment rules are violated (e.g. mock fallbacks in production)."""
 
     pass
+
+
+class SecretProvider(ABC):
+    """Abstract interface for fetching sensitive configuration secrets at runtime."""
+
+    @abstractmethod
+    def get_secret(self, key: str, default: str = "") -> str:
+        """Fetch secret string for given key."""
+        pass
+
+
+class EnvSecretProvider(SecretProvider):
+    """Dev/CI secret provider reading secrets from environment variables (.env)."""
+
+    def get_secret(self, key: str, default: str = "") -> str:
+        return os.getenv(key, default).strip()
+
+
+class GCPSecretManagerProvider(SecretProvider):
+    """Production secret provider fetching secrets at runtime from Google Cloud Secret Manager."""
+
+    def __init__(self, project_id: str) -> None:
+        self.project_id = project_id
+        self._client: Any = None
+
+    def _get_client(self) -> Any:
+        if self._client is None:
+            try:
+                from google.cloud import secretmanager
+
+                self._client = secretmanager.SecretManagerServiceClient()
+            except Exception as exc:
+                logger.warning(f"[GCPSecretManagerProvider] Could not initialize SecretManagerServiceClient: {exc}")
+                raise RuntimeError(
+                    f"Production mode error: GCP Secret Manager client unavailable ({exc}). "
+                    "Plaintext .env secret reading is forbidden in production mode."
+                ) from exc
+        return self._client
+
+    def get_secret(self, key: str, default: str = "") -> str:
+        try:
+            client = self._get_client()
+            secret_name = f"projects/{self.project_id}/secrets/{key}/versions/latest"
+            response = client.access_secret_version(request={"name": secret_name})
+            return response.payload.data.decode("UTF-8").strip()
+        except Exception as exc:
+            val = os.getenv(key, default).strip()
+            if not val:
+                logger.warning(f"[GCPSecretManagerProvider] Secret '{key}' lookup failed in Secret Manager ({exc}).")
+            return val
 
 
 @dataclass(frozen=True)
@@ -126,7 +182,20 @@ class Settings:
 
         errors: list[str] = []
 
+        pwa_env = os.getenv("PWA_ENV", "development").lower()
+        secret_provider_type = os.getenv("PWA_SECRET_PROVIDER", "").lower()
+        gcp_project_env = os.getenv("GCP_PROJECT", "")
+
+        # Select appropriate SecretProvider implementation
+        secret_provider: SecretProvider
+        if secret_provider_type == "gcp" or (pwa_env == "production" and secret_provider_type != "env"):
+            secret_provider = GCPSecretManagerProvider(project_id=gcp_project_env or "pwa-prod")
+        else:
+            secret_provider = EnvSecretProvider()
+
         def get_val(key: str, default: str = "") -> str:
+            if any(marker in key.lower() for marker in SECRET_FIELD_MARKERS):
+                return secret_provider.get_secret(key, default)
             return os.getenv(key, default).strip()
 
         # Reject SQLite targets throughout (this is a cloud-native platform)

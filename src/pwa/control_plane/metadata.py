@@ -159,7 +159,16 @@ class ControlPlaneManager:
         table_name: Optional[str] = None,
         run_id: Optional[str] = None,
     ) -> None:
-        """Record an operational audit log entry."""
+        """Record an append-only operational audit log entry into BigQuery `pwa_audit_log`.
+
+        Security Posture & Immutability Architecture:
+        1. App-Layer: Writes strictly append-only entries (WRITE_APPEND).
+        2. IAM Scoping: Application service accounts should be restricted to append-only
+           grants on `pwa_metadata.pwa_audit_log` (without delete/update permissions).
+        3. Regulatory Compliance (SOC2/HIPAA): Enterprise deployments should route
+           Google Cloud Audit Logs (Admin & Data Access) to a SIEM / GCS bucket
+           configured with WORM (Write Once Read Many) retention lock.
+        """
         now = datetime.now(timezone.utc).isoformat()
         audit_record = {
             "timestamp": now,

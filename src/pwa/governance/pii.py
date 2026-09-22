@@ -146,10 +146,100 @@ def import_math_isnan(val: float) -> bool:
     return math.isnan(val)
 
 
+import os
+from typing import Any, Dict, List, Optional
+
+
+def inspect_content_pii(text: str) -> list[dict[str, Any]]:
+    """Perform content-based PII inspection on free-text fields via GCP Cloud DLP API.
+
+    Gated by PWA_DLP_SCAN_ENABLED=1. Scans unstructured text for EMAIL_ADDRESS,
+    PHONE_NUMBER, US_SOCIAL_SECURITY_NUMBER, and PERSON_NAME.
+    """
+    if os.getenv("PWA_DLP_SCAN_ENABLED", "0").strip() != "1" or not text:
+        return []
+
+    try:
+        from google.cloud import dlp_v2
+
+        client = dlp_v2.DlpServiceClient()
+        parent = f"projects/{_policy_tag_project()}"
+        item = {"value": str(text)}
+        inspect_config = {
+            "info_types": [
+                {"name": "EMAIL_ADDRESS"},
+                {"name": "PHONE_NUMBER"},
+                {"name": "US_SOCIAL_SECURITY_NUMBER"},
+                {"name": "PERSON_NAME"},
+            ],
+            "min_likelihood": dlp_v2.Likelihood.LIKELY,
+        }
+        response = client.inspect_content(
+            request={"parent": parent, "inspect_config": inspect_config, "item": item}
+        )
+        findings = []
+        result_obj = getattr(response, "result", response)
+        findings_list = getattr(result_obj, "findings", []) or []
+        for finding in findings_list:
+            info_type_name = getattr(finding.info_type, "name", str(finding.info_type))
+            likelihood_name = getattr(finding.likelihood, "name", str(finding.likelihood))
+            quote_val = getattr(finding, "quote", "")
+            findings.append(
+                {
+                    "info_type": info_type_name,
+                    "likelihood": likelihood_name,
+                    "quote": quote_val,
+                }
+            )
+        return findings
+    except Exception as exc:
+        import logging
+
+        logging.getLogger("pwa.governance.pii").warning(f"[Cloud DLP] Inspection failed ({exc}).")
+        return []
+
+
+def apply_bigquery_column_policy_tags(
+    writer: Any,
+    dataset_id: str,
+    table_name: str,
+    columns: list[str],
+) -> list[str]:
+    """Apply Data Catalog policy tags directly to BigQuery table columns via DDL.
+
+    Emits BigQuery DDL:
+    ALTER TABLE `project.dataset.table` ALTER COLUMN col SET OPTIONS (policy_tags=["..."]);
+
+    Returns list of DDL statements executed or prepared.
+    """
+    ddl_statements = []
+    project = getattr(writer, "project", "pwa-prod")
+
+    for col in columns:
+        tag = classify_column(col)
+        if tag.is_pii and tag.policy_tag:
+            ddl = (
+                f"ALTER TABLE `{project}.{dataset_id}.{table_name}` "
+                f"ALTER COLUMN `{col}` SET OPTIONS (policy_tags=[\"{tag.policy_tag}\"]);"
+            )
+            ddl_statements.append(ddl)
+            if not getattr(writer, "mock", False) and getattr(writer, "_client", None) is not None:
+                try:
+                    writer._client.query(ddl).result()
+                except Exception as exc:
+                    import logging
+
+                    logging.getLogger("pwa.governance.pii").warning(
+                        f"Could not set policy tag on `{dataset_id}.{table_name}.{col}`: {exc}"
+                    )
+    return ddl_statements
+
+
 def mask_dataframe_pii(df: Any, mask_levels: list[SensitivityLevel] | None = None) -> Any:
     """Mask PII columns in a pandas DataFrame post-query execution before returning to UI/exports.
 
     Modifies or returns a copy of the DataFrame with RESTRICTED/CONFIDENTIAL PII columns masked.
+    If PWA_DLP_SCAN_ENABLED=1, also inspects free-text columns for embedded PII.
     """
     import pandas as pd
 
@@ -159,10 +249,30 @@ def mask_dataframe_pii(df: Any, mask_levels: list[SensitivityLevel] | None = Non
     df_masked = df.copy()
     target_levels = mask_levels or [SensitivityLevel.RESTRICTED, SensitivityLevel.CONFIDENTIAL]
 
+    dlp_enabled = os.getenv("PWA_DLP_SCAN_ENABLED", "0").strip() == "1"
+
     for col in df_masked.columns:
-        tag = classify_column(str(col))
+        col_str = str(col)
+        tag = classify_column(col_str)
+
         if tag.is_pii and (tag.masking_required or tag.sensitivity in target_levels):
-            df_masked[col] = df_masked[col].apply(lambda v: mask_pii_value(str(col), v))
+            df_masked[col] = df_masked[col].apply(lambda v: mask_pii_value(col_str, v))
+        elif dlp_enabled and df_masked[col].dtype == object:
+            # Free-text column content-based scan
+            def _mask_dlp_freetext(val: Any) -> Any:
+                if not val or not isinstance(val, str):
+                    return val
+                findings = inspect_content_pii(val)
+                if findings:
+                    masked = val
+                    for f in findings:
+                        q = f.get("quote")
+                        if q:
+                            masked = masked.replace(q, "***REDACTED_PII***")
+                    return masked
+                return val
+
+            df_masked[col] = df_masked[col].apply(_mask_dlp_freetext)
 
     return df_masked
 

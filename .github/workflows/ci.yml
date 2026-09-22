@@ -23,6 +23,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,orchestration,cache]"
 
+      - name: Run Gitleaks Secret Scanner
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Semgrep SAST Security Scan
+        run: |
+          pip install semgrep
+          semgrep scan --config p/security --error src/pwa/ingestion/connectors/ src/pwa/agent/
+
       - name: Lint with Ruff
         run: |
           ruff check .
