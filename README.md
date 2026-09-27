@@ -2,12 +2,22 @@
 
 > **State-of-the-Art Multi-Agent AI Data Engineering & Heterogeneous Lakehouse Analytics Platform**
 
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
-[![Google BigQuery](https://img.shields.io/badge/Warehouse-Google_BigQuery-669DF6.svg?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com/bigquery)
-[![Multi-Agent AI](https://img.shields.io/badge/AI_Engine-Multi--Agent_Pipeline-7B2CBF.svg?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/Dakshin10/polyglot-warehouse-agent)
-[![Data Quality](https://img.shields.io/badge/Quality-13_Enterprise_Gates-00B4D8.svg?style=for-the-badge&logo=shield&logoColor=white)](https://github.com/Dakshin10/polyglot-warehouse-agent)
-[![Tests Passing](https://img.shields.io/badge/Tests-419_Passed_Offline-00F5D4.svg?style=for-the-badge&logo=pytest&logoColor=black)](https://github.com/Dakshin10/polyglot-warehouse-agent)
-[![License: MIT](https://img.shields.io/badge/License-MIT-FFB703.svg?style=for-the-badge)](LICENSE)
+<div align="center">
+
+<!-- Core Stack -->
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/Powered%20by-Multi--Agent%20AI-6E56CF?style=for-the-badge&logo=openai&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-F5A623?style=for-the-badge)
+
+
+<!-- Data Sources -->
+![BigQuery](https://img.shields.io/badge/BigQuery-Lakehouse-4285F4?style=for-the-badge&logo=googlebigquery&logoColor=white)
+![AlloyDB](https://img.shields.io/badge/AlloyDB-PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white)
+![Aiven](https://img.shields.io/badge/Aiven-MySQL-FF5A5A?style=for-the-badge&logo=mysql&logoColor=white)
+![Cloudflare D1](https://img.shields.io/badge/Cloudflare%20D1-SQLite-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)
+
+
+</div>
 
 ---
 
@@ -17,30 +27,15 @@
 
 It unifies **3 heterogeneous operational source engines** (Cloudflare D1 SQLite, Cloud AlloyDB PostgreSQL, and Aiven MySQL) and Kaggle enterprise datasets into a **Google BigQuery Data Lakehouse** (Bronze/Silver/Gold/Metadata). On top of this governed data foundation sits a **governed 4-Agent AI analytics engine** capable of translating natural language questions into accurate, fanout-safe SQL, executing offline against local SQLite mirrors or live in BigQuery, and rendering automated visualization recommendations.
 
-```
-┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 HIGH-LEVEL PLATFORM FLOW                                         │
-│                                                                                                  │
-│  [Heterogeneous Sources]  ➜  [13 Quality Gates]  ➜  [BigQuery Lakehouse]  ➜  [Multi-Agent AI]     │
-│  • Cloudflare D1 (SQLite)    • PK Uniqueness         • RAW / Bronze            • Agent 1: Grounding │
-│  • AlloyDB (PostgreSQL)      • Schema Drift Check    • STAGING / Silver        • Agent 2: SQL Gen   │
-│  • Aiven (MySQL)             • Watermark Bounds      • CURATED / Gold          • Agent 3: Safety    │
-│  • Multi-Domain CSVs         • Freshness SLAs        • Metadata Control        • Agent 4: Synthesis │
-└──────────────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
 ---
 
-## 🎯 Project Milestones & Capabilities
+## 🖥️ Platform Interface Showcase
 
-| Phase | Milestone Name | Description & Capabilities | Status |
-| :--- | :--- | :--- | :---: |
-| **Phase 1A** | **Source Data Foundation** | Nexora domain migration, Kaggle dataset decoupling, multi-database schema registries. | `[COMPLETED]` |
-| **Phase 1B** | **Ingestion & Lakehouse** | Connectors, chunked extraction engine, control plane (`pwa_metadata`), 13 quality gates, SLA watermarks. | `[COMPLETED]` |
-| **Phase 1C** | **Production Hardening** | Incremental watermark ingestion, exponential backoff retries, dead letter queue, PII security guardrails. | `[COMPLETED]` |
-| **Phase 2A** | **Enterprise Semantic Layer** | Catalog loader, query planner, governed SQL generator, safety validator, fanout CTE pre-aggregator. | `[COMPLETED]` |
-| **Phase 2B** | **Multi-Agent AI Pipeline** | 4-agent orchestration (Grounding, Governed SQL, Exec/Safety, Answer Synthesis), viz recommendation. | `[COMPLETED]` |
-| **Phase 2C** | **Advanced Analytics & DS** | YoY/MoM growth comparison, driver contribution, cohort retention, conversion funnels, anomaly detection. | `[COMPLETED]` |
+### 💬 Governed AI Conversational Chat Interface
+![Governed AI Conversational Chat Interface](assets/product_screenshot.png)
+
+### 📄 Executive Analytical Deliverable Report View
+![Executive Analytical Deliverable Report View](assets/product_screenshot_report.png)
 
 ---
 
@@ -48,59 +43,7 @@ It unifies **3 heterogeneous operational source engines** (Cloudflare D1 SQLite,
 
 The diagram below details the entire end-to-end flow from source extraction through data lakehouse layering to multi-agent query execution and analytics visualization.
 
-```mermaid
-flowchart TD
-    subgraph SOURCES["1. Heterogeneous Operational Sources"]
-        D1["Cloudflare D1 (SQLite)<br/><i>CRM, Support, Marketing</i>"]
-        ALLOY["Cloud AlloyDB (PostgreSQL)<br/><i>Core ERP & E-Commerce</i>"]
-        AIVEN["Aiven MySQL (MySQL)<br/><i>Supply Chain & Logistics</i>"]
-        FILES["Kaggle Multi-Domain CSVs<br/><i>AdventureWorks & Olist</i>"]
-    end
-
-    subgraph ENGINE["2. PWA Ingestion & Quality Control Engine"]
-        EXT["Bounded Extraction Engine<br/><i>Chunking, Hash Fingerprinting</i>"]
-        DRIFT["Schema Evolution Auditor<br/><i>Type Coercion & Drift Check</i>"]
-        GATES["13 Enterprise Quality Gates<br/><i>Nulls, Ranges, PK Uniqueness</i>"]
-        CP["Control Plane Metadata Store<br/><i>pwa_metadata (8 telemetry tables)</i>"]
-    end
-
-    subgraph WAREHOUSE["3. Google BigQuery Lakehouse Layers"]
-        RAW["RAW / BRONZE Dataset<br/>(nexora_raw: _pwa_payload_hash)"]
-        STAGING["STAGING / SILVER Dataset<br/>(nexora_staging: snake_case, typed)"]
-        CURATED["CURATED / GOLD Dataset<br/>(nexora_curated: Governed Entities)"]
-    end
-
-    subgraph FASTPATH["4. Fast-Path & Smart Caching Layer"]
-        SCACHE["Smart Cache & SyncStateStore<br/>(SHA-256 Table Signal Hashing)"]
-        TEMPL["Template Router & Rollups<br/>(Pre-Aggregated Fast Path)"]
-    end
-
-    subgraph AI_AGENTS["5. Governed Multi-Agent AI Pipeline"]
-        USER(["User Natural Language Query"])
-        ROUTER["Router Agent<br/>(Intent Classification & Ambiguity Check)"]
-        AG1["Agent 1: Semantic Grounding<br/>(Dense Embedding & TF-IDF Cosine Similarity)"]
-        AG2["Agent 2: Governed SQL Agent<br/>(Query Planner & CTE Fanout Protection)"]
-        AG3["Agent 3: Safety & Exec Agent<br/>(SqlSafetyValidator & BQ / SQLite Engine)"]
-        AG4["Agent 4: Answer Synthesis<br/>(Markdown Synthesis, Viz Router & Plotly)"]
-    end
-
-    D1 & ALLOY & AIVEN & FILES --> EXT
-    EXT --> DRIFT --> GATES --> RAW
-    EXT -. Telemetry .- CP
-    GATES -. Results .- CP
-
-    RAW --> STAGING --> CURATED
-    CURATED --> SCACHE
-    CURATED --> TEMPL
-
-    USER --> ROUTER
-    ROUTER --> SCACHE
-    SCACHE -- Cache Hit --> AG4
-    SCACHE -- Cache Miss --> TEMPL
-    TEMPL -- Miss / Custom --> AG1
-    AG1 --> AG2 --> AG3 --> AG4
-    AG3 -- Execute SQL --> CURATED
-```
+![End-to-End System Architecture](assets/Architecture.png)
 
 ---
 
@@ -126,27 +69,7 @@ salitsteel-502008 (BigQuery GCP Project)
 └── ⚙️ pwa_metadata                ➜ CONTROL PLANE: Operational telemetry & audit logs
 ```
 
-```mermaid
-graph LR
-    subgraph Bronze["RAW / BRONZE (nexora_raw)"]
-        R1["raw_salesorderheader"]
-        R2["raw_customer"]
-        R3["raw_product"]
-    end
-    subgraph Silver["STAGING / SILVER (nexora_staging)"]
-        S1["staging_sales_order"]
-        S2["staging_customer"]
-        S3["staging_product"]
-    end
-    subgraph Gold["CURATED / GOLD (nexora_curated)"]
-        G1["fact_sales_order"]
-        G2["dim_customer"]
-        G3["dim_product"]
-    end
-    R1 --> S1 --> G1
-    R2 --> S2 --> G2
-    R3 --> S3 --> G3
-```
+![BigQuery Warehouse Layering Architecture](assets/BigQuery%20Warehouse%20Layering%20Architecture.png)
 
 ### 1. RAW / BRONZE (`nexora_raw`)
 Append-only raw tables preserving exact source payloads alongside standardized lineage headers:
@@ -179,33 +102,7 @@ Operational telemetry recorded across 8 internal tracking tables:
 
 When a user asks a natural language question (e.g. *"Show monthly revenue by product category"*), PWA routes the request through a 4-agent orchestration workflow:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User
-    participant Router as Fast-Path / Router
-    participant Ag1 as Agent 1: Grounding
-    participant Ag2 as Agent 2: Governed SQL
-    participant Ag3 as Agent 3: Safety & Exec
-    participant Ag4 as Agent 4: Synthesis & Viz
-
-    User->>Router: "Show monthly revenue by category"
-    Router->>Router: Check Smart Cache & Template Router
-    alt Fast Path Cache Hit
-        Router-->>User: Return Cached Result (<5ms)
-    else Cache Miss / Custom Query
-        Router->>Ag1: Route Question
-        Ag1->>Ag1: Evaluate Ambiguity & Catalog Embedding Match
-        Ag1->>Ag2: Return GroundedIntent
-        Ag2->>Ag2: Plan Query & Check Fan-out Risk (CTE Pre-agg)
-        Ag2->>Ag3: Return Governed QueryPlan
-        Ag3->>Ag3: Validate SqlSafety (Read-only check)
-        Ag3->>Ag3: Execute via BQ Client or Local SQLite Engine
-        Ag3->>Ag4: Return Query Result Dataframe
-        Ag4->>Ag4: Synthesize Markdown Answer & Recommend Viz
-        Ag4-->>User: Final Answer, Evidence Panel & Chart
-    end
-```
+![Governed Multi-Agent AI Analytics Pipeline](assets/Governed%20Multi-Agent%20AI%20Analytics%20Pipeline.png)
 
 ### Agent Detailed Breakdown
 

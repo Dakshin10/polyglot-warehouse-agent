@@ -165,14 +165,14 @@ def render_viz_panel(
         primary_icon = _TYPE_ICONS.get(primary_type, "📊")
         reason = primary_d.get("reason", "")
 
-        # HITL recommendation banner for graphs
+        # HITL recommendation banner for graphs (monochrome design)
         st.markdown(
             f"""
-            <div style="background: rgba(13, 110, 253, 0.04); border: 1px dashed rgba(13, 110, 253, 0.3); border-radius: 10px; padding: 0.85rem 1.15rem; margin-bottom: 0.75rem;">
-                <div style="font-weight: 600; font-size: 0.92rem; color: var(--pwa-text-primary); margin-bottom: 0.25rem;">
-                    💡 Graph Visualization Recommended: <span style="color: #0d6efd;">{primary_icon} {primary_label}</span>
+            <div style="background: #F4F4F5; border: 1px dashed #71717A; border-radius: 8px; padding: 0.85rem 1.15rem; margin-bottom: 0.75rem;">
+                <div style="font-weight: 600; font-size: 0.92rem; color: #09090B; margin-bottom: 0.25rem;">
+                    💡 Graph Visualization Recommended: <span style="color: #09090B; font-weight: 700;">{primary_icon} {primary_label}</span>
                 </div>
-                <div style="font-size: 0.85rem; color: var(--pwa-text-secondary);">
+                <div style="font-size: 0.85rem; color: #71717A;">
                     {reason or f"The AI detected that this data is best visualized using a {primary_label}."}
                 </div>
             </div>

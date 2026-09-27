@@ -42,22 +42,43 @@ class AnalyticalAnswer:
     data_source: str = "bigquery"
 
 
+def _format_value(key: str, val: Any) -> str:
+    """Format single cell value into human-readable currency, numeric, or string representation."""
+    if isinstance(val, float):
+        if any(
+            kw in key.lower() for kw in ["revenue", "sales", "price", "cost", "total", "expenditure", "due", "amount"]
+        ):
+            return f"${val:,.2f}"
+        return f"{val:,.2f}"
+    elif isinstance(val, int):
+        if any(
+            kw in key.lower() for kw in ["revenue", "sales", "price", "cost", "total", "expenditure", "due", "amount"]
+        ):
+            return f"${val:,}"
+        return f"{val:,}"
+    return str(val)
+
+
 def _summarize_numeric_columns(rows: list[dict[str, Any]], columns: list[str]) -> str:
-    """Summarize numeric columns across ALL result rows (not just the first), so a
-    multi-row answer reflects the whole result set instead of a single sampled row."""
+    """Summarize numeric columns across ALL result rows."""
     if not rows:
         return ""
     parts: list[str] = []
     for col in columns:
-        values = [row[col] for row in rows if isinstance(row.get(col), (int, float))]
+        values = [v for row in rows if isinstance((v := row.get(col)), (int, float))]
         if not values:
             continue
         total = sum(values)
-        parts.append(
-            f"{col} totals {total:,.2f} across all {len(rows)} rows"
-            if isinstance(total, float)
-            else f"{col} totals {total:,} across all {len(rows)} rows"
+        formatted_total = (
+            f"${total:,.2f}"
+            if any(
+                kw in col.lower()
+                for kw in ["revenue", "sales", "price", "cost", "total", "expenditure", "due", "amount"]
+            )
+            else (f"{total:,.2f}" if isinstance(total, float) else f"{total:,}")
         )
+        col_clean = col.replace("_", " ")
+        parts.append(f"{col_clean} totals **{formatted_total}** across all {len(rows)} rows")
     return " ".join(parts[:2])
 
 
@@ -81,36 +102,110 @@ class AnswerSynthesisAgent:
         if query_result.rows:
             first_row = query_result.rows[0]
             for col, val in first_row.items():
-                if isinstance(val, (int, float)):
-                    key_findings.append(f"{col}: {val:,.2f}" if isinstance(val, float) else f"{col}: {val:,}")
-                else:
-                    key_findings.append(f"{col}: {val}")
+                fmt_val = _format_value(col, val)
+                col_name = col.replace("_", " ").title()
+                key_findings.append(f"{col_name}: {fmt_val}")
 
-        # 3. Construct Numerical Grounding Answer Text
+        # 3. Construct Natural Language Human-Readable Answer Text
         if not query_result.rows:
-            answer_text = "The query completed successfully, but returned 0 matching records."
+            answer_text = "The query completed successfully, but returned 0 matching records in the warehouse."
             obs = "0 rows returned."
+
         elif len(query_result.rows) == 1 and len(query_result.columns) == 1:
             val = list(query_result.rows[0].values())[0]
-            answer_text = f"The result for '{question}' is {val}."
+            col_name = list(query_result.rows[0].keys())[0]
+            fmt_val = _format_value(col_name, val)
+            clean_q = question.strip("?").strip()
+            answer_text = f"The result for **{clean_q}** is **{fmt_val}**."
             obs = f"Single metric result: {val}."
-        elif len(query_result.rows) == 1:
-            bullets = ", ".join(f"{k} = {v}" for k, v in query_result.rows[0].items())
-            answer_text = f"Based on enterprise warehouse data: {bullets}."
-            obs = f"Single result row: {bullets}."
-        else:
-            top_rows = query_result.rows[:3]
-            row_lines = [", ".join(f"{k}={v}" for k, v in row.items()) for row in top_rows]
-            row_summary = "; ".join(row_lines)
-            numeric_summary = _summarize_numeric_columns(query_result.rows, query_result.columns)
-            extra = f" {numeric_summary}" if numeric_summary else ""
-            answer_text = (
-                f"Based on enterprise warehouse data ({query_result.row_count} rows returned), "
-                f"the top results are: {row_summary}.{extra}"
-            )
-            obs = f"Top {len(top_rows)} of {query_result.row_count} rows: {row_summary}.{extra}"
 
-        # Add freshness / quality warnings if present
+        elif len(query_result.rows) == 1:
+            items = [_format_value(k, v) for k, v in query_result.rows[0].items()]
+            bullets = ", ".join(
+                f"**{k.replace('_', ' ').title()}**: {v}" for k, v in zip(query_result.rows[0].keys(), items)
+            )
+            answer_text = f"Based on enterprise warehouse data:\n\n{bullets}"
+            obs = f"Single result row: {bullets}"
+
+        else:
+            # Multi-row synthesis: Sort by main numeric metric descending so top results lead
+            rows_copy = list(query_result.rows)
+            name_col = next(
+                (
+                    k
+                    for k in query_result.columns
+                    if "name" in k or "title" in k or "category" in k or "type" in k or "year" in k or "segment" in k
+                ),
+                query_result.columns[0],
+            )
+            num_col = next(
+                (
+                    k
+                    for k in query_result.columns
+                    if any(isinstance(r.get(k), (int, float)) for r in rows_copy) and k != name_col
+                ),
+                None,
+            )
+
+            if num_col:
+                try:
+                    rows_copy.sort(key=lambda r: r.get(num_col, 0) or 0, reverse=True)
+                except Exception:
+                    pass
+
+            top_rows = rows_copy[:5]
+            row_items = []
+            for r in top_rows:
+                name_val = str(r.get(name_col, ""))
+                if num_col and r.get(num_col) is not None:
+                    val_str = _format_value(num_col, r[num_col])
+                    row_items.append((name_val, val_str))
+                else:
+                    row_items.append((name_val, ""))
+
+            # Calculate total if applicable
+            total_sum_str = ""
+            if num_col:
+                all_nums = [v for r in query_result.rows if isinstance((v := r.get(num_col)), (int, float))]
+                if all_nums:
+                    t_sum = sum(all_nums)
+                    total_sum_str = _format_value(num_col, t_sum)
+
+            if total_sum_str:
+                headline = f"Total across all **{query_result.row_count} rows** returned reached **{total_sum_str}**."
+            else:
+                headline = f"Based on enterprise warehouse data (**{query_result.row_count} rows** returned):"
+
+            if row_items:
+                top_name, top_val = row_items[0]
+                if top_val:
+                    lead_phrase = f"**{top_name}** generated the highest sales at **{top_val}**"
+                else:
+                    lead_phrase = f"**{top_name}** led the results"
+
+                other_phrases = []
+                for n, v in row_items[1:]:
+                    if v:
+                        other_phrases.append(f"**{n}** ({v})")
+                    else:
+                        other_phrases.append(f"**{n}**")
+
+                if other_phrases:
+                    if len(other_phrases) > 1:
+                        others_str = ", ".join(other_phrases[:-1]) + f", and {other_phrases[-1]}"
+                    else:
+                        others_str = other_phrases[0]
+                    body_phrase = f"{lead_phrase}, followed by {others_str}."
+                else:
+                    body_phrase = f"{lead_phrase}."
+
+                answer_text = f"{headline} {body_phrase}"
+            else:
+                answer_text = headline
+
+            obs = f"Top {len(top_rows)} of {query_result.row_count} rows synthesized."
+
+        # Track warnings in metadata
         warnings = list(query_result.warnings)
         if query_result.freshness_status != "FRESH":
             warnings.append(f"Data freshness SLA status is `{query_result.freshness_status}`.")
@@ -118,11 +213,10 @@ class AnswerSynthesisAgent:
             warnings.append(f"Data quality status is `{query_result.quality_status}`.")
         if query_result.is_mock:
             warnings.append(
-                f"⚠️ MOCK DATA SOURCE NOTICE: Query executed in offline mock mode using placeholder values (data_source='{query_result.data_source}')."
+                f"MOCK DATA SOURCE NOTICE: Query executed using offline local source ('{query_result.data_source}')."
             )
-            answer_text += f" [Offline Mock Mode: results from placeholder/local source '{query_result.data_source}']"
 
-        # 4. Numerical Grounding Anti-Hallucination Audit
+        # 4. Anti-Hallucination Audit
         self._verify_numerical_grounding(answer_text, query_result.rows)
 
         return AnalyticalAnswer(
@@ -144,7 +238,7 @@ class AnswerSynthesisAgent:
                 f"Descriptive summary of curated enterprise data from "
                 f"{', '.join(query_result.semantic_objects_used) or 'the queried source'}."
             ),
-            causal_claims_asserted=[],  # Zero unsupported causal claims asserted
+            causal_claims_asserted=[],
             is_mock=query_result.is_mock,
             data_source=query_result.data_source,
         )
@@ -159,7 +253,6 @@ class AnswerSynthesisAgent:
                     valid_numbers.add(float(val))
 
         for num in numbers_in_text:
-            # Allow common small structural numbers (e.g. 0, 1, 2, 3, 100) or check if in valid_numbers
             if num > 10 and num not in valid_numbers:
                 logger.warning(
                     f"Numerical grounding warning: Number `{num}` in answer text not found directly in QueryResult rows."

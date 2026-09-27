@@ -1,4 +1,4 @@
-"""Polyglot Warehouse Agent (PWA) — Monochrome Conversational Chat Interface.
+"""Polyglot Warehouse Agent (PWA) — Enterprise Client-Grade Interface.
 
 Run locally:
     streamlit run app.py
@@ -20,14 +20,20 @@ if str(_SRC_DIR) not in sys.path:
 
 import streamlit as st  # noqa: E402
 from pwa.ui.components.answer_panel import render_answer_panel  # noqa: E402
+from pwa.ui.components.clarification_panel import (  # noqa: E402
+    is_ambiguity_response,
+    render_clarification_panel,
+)
 from pwa.ui.components.evidence_panel import render_evidence_panel  # noqa: E402
 from pwa.ui.components.header import render_header  # noqa: E402
+from pwa.ui.components.hero import render_hero_section  # noqa: E402
 from pwa.ui.components.rejection_panel import render_rejection_panel  # noqa: E402
+from pwa.ui.components.report_view import render_report_view  # noqa: E402
+from pwa.ui.components.sidebar import render_sidebar  # noqa: E402
 from pwa.ui.components.stage_tracker import (  # noqa: E402
     render_pipeline_trace_expander,
     render_thinking_status,
 )
-from pwa.ui.components.report_view import render_report_view  # noqa: E402
 from pwa.ui.styles import apply_custom_styles  # noqa: E402
 
 # Try importing real orchestrator
@@ -64,7 +70,7 @@ def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResul
     for stage_name, extra in stages:
         if stage_callback:
             stage_callback(stage_name, "started", extra)
-        time.sleep(0.3)
+        time.sleep(0.2)
         if stage_callback:
             stage_callback(stage_name, "completed", extra)
 
@@ -119,11 +125,7 @@ def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResul
 
 
 def _audit_query(username: str, question: str, result: Any) -> None:
-    """Best-effort per-user audit trail for real (non-stub) queries.
-
-    Never raises into the chat flow: a query-audit failure should degrade to
-    "not logged," not "the user got an error instead of their answer."
-    """
+    """Best-effort per-user audit trail for real queries."""
     try:
         from pwa.control_plane.metadata import ControlPlaneManager
 
@@ -137,19 +139,17 @@ def _audit_query(username: str, question: str, result: Any) -> None:
             message=f"user='{username}' status={status} question={question[:200]!r}",
             source_name="streamlit_ui",
         )
-    except Exception as exc:  # pragma: no cover - best-effort, never fatal
-        import logging
-
-        logging.getLogger("pwa.ui.app").debug(f"Query audit logging failed: {exc}")
+    except Exception:
+        pass
 
 
 def _render_assistant_avatar() -> None:
-    """Render plain square initials avatar for assistant."""
+    """Render square initials avatar for assistant."""
     st.markdown('<div class="pwa-avatar-square" style="margin-bottom: 0.35rem;">PW</div>', unsafe_allow_html=True)
 
 
 def _render_user_turn(content: str) -> None:
-    """Render user turn with right-aligned bubble and square initials avatar."""
+    """Render user turn with right-aligned bubble and square avatar."""
     st.markdown(
         f"""
         <div class="pwa-chat-row user-row">
@@ -165,27 +165,17 @@ def _render_assistant_result(
     result: str | PipelineResult | dict,
     question: str = "",
     msg_idx: int = 0,
-) -> None:
-    """Render avatar, answer text, pipeline trace, and evidence expanders for one turn.
-
-    Args:
-        result:   PipelineResult, dict, or plain rejection string.
-        question: Original question — forwarded to viz_panel for keyword heuristics.
-        msg_idx:  Stable index from enumerate(messages); keys session_state for
-                  the alternative chart button state of this specific turn.
-    """
+) -> str | None:
+    """Render answer, interactive ambiguity cards, trace, and evidence panel."""
     _render_assistant_avatar()
+    clarification_selection = None
 
     if isinstance(result, str):
-        render_rejection_panel(result)
-        return
-
-    is_mock = getattr(result, "is_mock", False) or (isinstance(result, dict) and result.get("is_mock", False))
-    data_source = getattr(result, "data_source", "bigquery") or (
-        result.get("data_source") if isinstance(result, dict) else "bigquery"
-    )
-    if is_mock or data_source in ("stub", "local_sqlite"):
-        st.warning(f"⚠️ No live data source configured — showing placeholder values (data_source: `{data_source}`)")
+        if is_ambiguity_response(result):
+            clarification_selection = render_clarification_panel(result, original_question=question)
+        else:
+            render_rejection_panel(result)
+        return clarification_selection
 
     answer_text = getattr(result, "answer", None) or (result.get("answer") if isinstance(result, dict) else "")
     stage_latencies = getattr(result, "stage_latencies", None) or (
@@ -193,35 +183,40 @@ def _render_assistant_result(
     )
 
     if answer_text:
-        render_answer_panel(answer_text)
+        if is_ambiguity_response(answer_text):
+            clarification_selection = render_clarification_panel(answer_text, original_question=question)
+        else:
+            render_answer_panel(answer_text)
 
     # Collapsible pipeline trace expander
     render_pipeline_trace_expander(stage_latencies)
 
-    # Viz panel (chart + reason caption + alternative buttons) + SQL + raw table + run details + generate report button
+    # Viz panel + SQL + raw table + run details + generate report button
     render_evidence_panel(result, question=question, msg_idx=msg_idx)
+
+    return clarification_selection
 
 
 def main() -> None:
-    # Page Config
     st.set_page_config(
-        page_title="pwa — Polyglot Warehouse Agent",
+        page_title="PWA — Enterprise AI Data Lakehouse Platform",
         page_icon="▪",
         layout="centered",
-        initial_sidebar_state="collapsed",
+        initial_sidebar_state="expanded",
     )
 
     # Apply Custom Grayscale & Typography CSS
     apply_custom_styles()
 
-    # Auth gate — no-op (returns "anonymous") if PWA_AUTH_USERS isn't
-    # configured, but always renders a banner so an open deployment is
-    # visibly open rather than silently open.
+    # Auth Gate
     from pwa.ui.auth import require_login
 
     current_user = require_login()
 
-    # Render Minimal Header (small top-left wordmark)
+    # Render Enterprise Sidebar Control Plane
+    sidebar_prompt = render_sidebar()
+
+    # Render Top Navigation Header Bar
     render_header()
 
     # Session State Initialization
@@ -229,19 +224,31 @@ def main() -> None:
         st.session_state.messages = []
     if "active_view" not in st.session_state:
         st.session_state.active_view = "chat"
+    if "pending_prompt" not in st.session_state:
+        st.session_state.pending_prompt = None
 
-    # View Router: Report View Mode vs Chat Thread Mode
+    # Handle sidebar query shortcut click
+    if sidebar_prompt:
+        st.session_state.pending_prompt = sidebar_prompt
+
+    # View Router: Report Deliverable View Mode vs Chat Thread Mode
     if st.session_state.active_view == "report" and st.session_state.get("active_report"):
         render_report_view(st.session_state.active_report)
         return
 
+    # Render Hero Empty State if zero messages present
+    hero_prompt = None
+    if len(st.session_state.messages) == 0:
+        hero_prompt = render_hero_section()
+        if hero_prompt:
+            st.session_state.pending_prompt = hero_prompt
+
     # 1. Render Chat Thread Scrollback
+    clarify_from_scrollback = None
     for msg_idx, msg in enumerate(st.session_state.messages):
         role = msg.get("role")
         content = msg.get("content", "")
         result = msg.get("result")
-        # Recover the original question so the viz panel can re-apply keyword
-        # heuristics and restore the correct button state during scrollback.
         original_question = msg.get("question", "")
 
         if role == "user":
@@ -249,16 +256,27 @@ def main() -> None:
                 _render_user_turn(content)
         elif role == "assistant":
             with st.chat_message("assistant", avatar=None):
-                _render_assistant_result(result or content, question=original_question, msg_idx=msg_idx)
+                sel = _render_assistant_result(result or content, question=original_question, msg_idx=msg_idx)
+                if sel:
+                    clarify_from_scrollback = sel
 
-    # 2. Pinned Bottom Composer
-    if prompt := st.chat_input("Ask a question about warehouse data…"):
+    if clarify_from_scrollback:
+        st.session_state.pending_prompt = clarify_from_scrollback
+
+    # 2. Input Handling (User typed input OR clicked chip/shortcut)
+    user_input = st.chat_input("Ask a natural language question about warehouse data…")
+    active_prompt = user_input or st.session_state.pending_prompt
+
+    if active_prompt:
+        # Clear pending prompt trigger
+        st.session_state.pending_prompt = None
+
         # Append User Turn
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.messages.append({"role": "user", "content": active_prompt})
         with st.chat_message("user", avatar=None):
-            _render_user_turn(prompt)
+            _render_user_turn(active_prompt)
 
-        # Active Assistant Turn with Transient Thinking Indicator
+        # Assistant turn execution
         with st.chat_message("assistant", avatar=None):
             thinking_placeholder = st.empty()
 
@@ -269,24 +287,18 @@ def main() -> None:
 
             try:
                 if _REAL_ORCHESTRATOR_AVAILABLE and os.getenv("PWA_USE_STUB_UI") != "1":
-                    res = run_query_verbose(prompt, stage_callback=_stage_cb)
-                    _audit_query(current_user, prompt, res)
+                    res = run_query_verbose(active_prompt, stage_callback=_stage_cb)
+                    _audit_query(current_user, active_prompt, res)
                 else:
-                    res = _stub_run_query_verbose(prompt, stage_callback=_stage_cb)
+                    res = _stub_run_query_verbose(active_prompt, stage_callback=_stage_cb)
             except Exception as exc:
-                res = f"Pipeline Error: {exc}"
+                res = f"Pipeline Execution Error: {exc}"
 
-            # Active assistant turn: msg_idx = current length of messages (the slot
-            # this turn will occupy once appended).  Session state for button clicks
-            # is written here and then re-read during the next scrollback render pass.
             active_msg_idx = len(st.session_state.messages)
-
             thinking_placeholder.empty()
 
-            # Render final answer and evidence (with question + stable idx for viz panel)
-            _render_assistant_result(res, question=prompt, msg_idx=active_msg_idx)
+            _render_assistant_result(res, question=active_prompt, msg_idx=active_msg_idx)
 
-            # Store in session thread state (persist question + viz_recommendation for scrollback)
             content_str = res if isinstance(res, str) else getattr(res, "answer", str(res))
             viz_rec = None
             if not isinstance(res, str):
@@ -298,7 +310,7 @@ def main() -> None:
                     "role": "assistant",
                     "content": content_str,
                     "result": res,
-                    "question": prompt,
+                    "question": active_prompt,
                     "viz_recommendation": viz_rec,
                 }
             )

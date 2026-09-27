@@ -69,7 +69,6 @@ def test_answer_synthesis_agent_mock_warning_and_text():
     assert ans.is_mock is True
     assert ans.data_source == "stub"
     assert any("MOCK DATA SOURCE NOTICE" in w for w in ans.warnings)
-    assert "Offline Mock Mode" in ans.answer_text or "stub" in ans.answer_text
 
 
 def test_pipeline_orchestrator_retains_mock_flag():

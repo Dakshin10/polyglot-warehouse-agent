@@ -5,93 +5,92 @@ import streamlit as st
 FONTS_AND_CSS = """
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap" rel="stylesheet">
 
 <style>
-/* Design Tokens (Monochrome Palette & Geometry) */
+/* ─── Design Tokens (Strict Monochrome Palette) ────────────────────────── */
 :root {
     --pwa-bg: #FFFFFF;
-    --pwa-surface: #F5F5F5;
-    --pwa-border: #E0E0E0;
-    --pwa-text-secondary: #6B6B6B;
-    --pwa-text-primary: #111111;
-    --pwa-interactive: #2B2B2B;
-    --pwa-radius: 4px;
+    --pwa-surface: #F8F9FA;
+    --pwa-surface-subtle: #F1F3F5;
+    --pwa-border: #E9ECEF;
+    --pwa-border-strong: #CED4DA;
+    --pwa-text-primary: #111827;
+    --pwa-text-secondary: #6B7280;
+    --pwa-text-tertiary: #9CA3AF;
+    --pwa-interactive: #111827;
+    --pwa-interactive-hover: #000000;
+    --pwa-radius: 8px;
+    --pwa-radius-sm: 4px;
+    --pwa-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
 }
 
-/* Global Typography & Background Override */
-html, body, [class*="st-"], .stApp {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+/* ─── Global Typography & Background Override ──────────────────────────── */
+html, body, .stApp {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
     background-color: var(--pwa-bg) !important;
     color: var(--pwa-text-primary) !important;
     -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-/* Material Symbols Icon Font Preservation */
-.material-symbols-outlined,
-.material-icons,
-[class*="material-symbols"],
-[data-testid="stExpanderIcon"],
-[data-testid="stIcon"],
-.stIcon,
-span[data-testid="stExpanderToggleIcon"] {
-    font-family: 'Material Symbols Outlined', 'Material Icons' !important;
+div, p, span, h1, h2, h3, h4, h5, h6, label {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* Centered Thread Layout (~700px max width) */
+/* ─── Centered Container Layout ────────────────────────────────────────── */
 .main .block-container {
-    max-width: 700px !important;
-    padding-top: 1.5rem !important;
-    padding-bottom: 6.5rem !important;
+    max-width: 760px !important;
+    padding-top: 2rem !important;
+    padding-bottom: 7.5rem !important;
     margin: 0 auto !important;
 }
 
-/* Hide Default Streamlit Chrome (Header bar decoration, footer, deployment buttons) */
+/* ─── Hide Default Streamlit Chrome ────────────────────────────────────── */
 header[data-testid="stHeader"] {
     background-color: transparent !important;
-}
-footer {
-    display: none !important;
-}
-#MainMenu, .stDeployButton {
-    visibility: hidden !important;
-    display: none !important;
+    z-index: 1 !important;
 }
 
-/* Brand Wordmark */
+footer, #MainMenu, .stDeployButton, [data-testid="stDecoration"] {
+    display: none !important;
+    visibility: hidden !important;
+}
+
+/* ─── Brand Wordmark ───────────────────────────────────────────────────── */
 .pwa-brand {
     font-family: 'Inter', sans-serif !important;
-    font-size: 1.25rem !important;
-    font-weight: 600 !important;
+    font-size: 1.35rem !important;
+    font-weight: 700 !important;
     color: var(--pwa-text-primary);
     margin: 0;
     line-height: 1.2;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
 }
 
 .pwa-brand-sub {
     font-family: 'Inter', sans-serif;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-weight: 400;
     color: var(--pwa-text-secondary);
-    margin-top: 0.15rem;
+    margin-top: 0.2rem;
     margin-bottom: 1.25rem;
 }
 
-/* Monospace Class — strictly for SQL, code, table data */
+/* ─── Monospace Utility ────────────────────────────────────────────────── */
 .pwa-mono {
     font-family: 'JetBrains Mono', monospace !important;
 }
 
-/* Chat Thread Overrides */
+/* ─── Chat Thread Styling ──────────────────────────────────────────────── */
 div[data-testid="stChatMessage"] {
     background-color: transparent !important;
     border: none !important;
-    padding: 0.5rem 0 !important;
-    margin-bottom: 0.25rem !important;
+    padding: 0.4rem 0 !important;
+    margin-bottom: 0.5rem !important;
 }
 
-/* Hide Streamlit default chat avatars across all versions */
+/* Hide Streamlit default chat avatars */
 div[data-testid*="stChatMessageAvatar"],
 div[data-testid="stChatMessageAvatarUser"],
 div[data-testid="stChatMessageAvatarAssistant"],
@@ -100,19 +99,18 @@ div[data-testid="stChatMessage"] > div:first-child:has(span, img, svg) {
     display: none !important;
 }
 
-/* Custom Initials Square Avatar */
+/* Square Initials Avatar */
 .pwa-avatar-square {
     width: 28px;
     height: 28px;
     min-width: 28px;
     min-height: 28px;
-    background-color: var(--pwa-surface);
-    border: 1px solid var(--pwa-border);
-    border-radius: var(--pwa-radius);
+    background-color: var(--pwa-interactive);
+    color: #FFFFFF;
+    border-radius: var(--pwa-radius-sm);
     font-family: 'Inter', sans-serif;
-    font-size: 0.72rem;
-    font-weight: 500;
-    color: var(--pwa-text-secondary);
+    font-size: 0.7rem;
+    font-weight: 600;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -133,11 +131,11 @@ div[data-testid="stChatMessage"] > div:first-child:has(span, img, svg) {
     justify-content: flex-end;
 }
 
-/* User Bubble: Right-aligned, surface bg, 1px border, 4px radius */
+/* User Speech Bubble */
 .pwa-user-bubble {
     background-color: var(--pwa-surface);
     color: var(--pwa-text-primary);
-    padding: 0.55rem 0.85rem;
+    padding: 0.65rem 0.95rem;
     border-radius: var(--pwa-radius);
     border: 1px solid var(--pwa-border);
     display: inline-block;
@@ -146,45 +144,97 @@ div[data-testid="stChatMessage"] > div:first-child:has(span, img, svg) {
     font-size: 0.92rem;
     font-weight: 400;
     line-height: 1.5;
+    box-shadow: var(--pwa-shadow-sm);
 }
 
-/* Assistant Answer Text: Weight 600 for final synthesized answer text */
+/* Assistant Answer Text */
 .pwa-assistant-text {
     font-family: 'Inter', sans-serif;
-    font-size: 0.95rem;
+    font-size: 0.96rem;
     font-weight: 600;
-    line-height: 1.6;
+    line-height: 1.65;
     color: var(--pwa-text-primary);
-    padding: 0.2rem 0;
+    padding: 0.15rem 0;
 }
 
-/* Collapsible Section (st.expander): Flat 1px border, 4px radius, no shadow */
+/* ─── Streamlit Expander Overrides & Bugfix for `_arr` text ────────────── */
 div.stExpander, div[data-testid="stExpander"] {
     border: 1px solid var(--pwa-border) !important;
     border-radius: var(--pwa-radius) !important;
     background-color: var(--pwa-surface) !important;
-    margin-top: 0.4rem !important;
-    margin-bottom: 0.4rem !important;
-    box-shadow: none !important;
+    margin-top: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+    box-shadow: var(--pwa-shadow-sm) !important;
     overflow: hidden !important;
+    transition: border-color 0.15s ease-in-out;
 }
 
+div.stExpander:hover, div[data-testid="stExpander"]:hover {
+    border-color: var(--pwa-border-strong) !important;
+}
+
+/* Fix expander summary button */
 div.stExpander summary, div[data-testid="stExpander"] summary {
     font-family: 'Inter', sans-serif !important;
-    font-size: 0.84rem !important;
+    font-size: 0.85rem !important;
     color: var(--pwa-text-primary) !important;
     font-weight: 500 !important;
     background-color: var(--pwa-surface) !important;
-    padding: 0.45rem 0.75rem !important;
+    padding: 0.55rem 0.85rem !important;
     border-radius: var(--pwa-radius) !important;
+    cursor: pointer !important;
+    transition: background-color 0.15s ease;
 }
 
 div.stExpander summary:hover, div[data-testid="stExpander"] summary:hover {
-    color: var(--pwa-interactive) !important;
-    background-color: #EFEFEF !important;
+    background-color: var(--pwa-surface-subtle) !important;
 }
 
-/* Code Blocks: JetBrains Mono, surface bg, 1px border, 4px radius */
+/* Ensure expander icons render correctly without font ligature bleed (`_arr` text fix) */
+[data-testid="stExpanderIcon"],
+[data-testid="stExpanderToggleIcon"],
+div.stExpander summary svg,
+div[data-testid="stExpander"] summary svg {
+    font-family: inherit !important;
+    fill: var(--pwa-text-secondary) !important;
+    color: var(--pwa-text-secondary) !important;
+}
+
+/* Expander content container */
+div[data-testid="stExpanderDetails"] {
+    padding: 0.85rem 0.95rem !important;
+    background-color: #FFFFFF !important;
+    border-top: 1px solid var(--pwa-border) !important;
+}
+
+/* ─── Buttons & Inputs ─────────────────────────────────────────────────── */
+button[kind="primary"], button[kind="secondary"], .stButton > button {
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.83rem !important;
+    font-weight: 500 !important;
+    border-radius: var(--pwa-radius) !important;
+    border: 1px solid var(--pwa-border-strong) !important;
+    background-color: #FFFFFF !important;
+    color: var(--pwa-text-primary) !important;
+    padding: 0.4rem 0.85rem !important;
+    transition: all 0.15s ease-in-out !important;
+    box-shadow: var(--pwa-shadow-sm) !important;
+}
+
+button[kind="primary"]:hover, button[kind="secondary"]:hover, .stButton > button:hover {
+    background-color: var(--pwa-interactive) !important;
+    color: #FFFFFF !important;
+    border-color: var(--pwa-interactive) !important;
+}
+
+button:disabled, .stButton > button:disabled {
+    background-color: var(--pwa-surface) !important;
+    color: var(--pwa-text-tertiary) !important;
+    border-color: var(--pwa-border) !important;
+    opacity: 0.75 !important;
+}
+
+/* Code Blocks */
 pre, code, .stCodeBlock, div[data-testid="stCodeBlock"] {
     font-family: 'JetBrains Mono', monospace !important;
     font-size: 0.82rem !important;
@@ -195,7 +245,7 @@ pre, code, .stCodeBlock, div[data-testid="stCodeBlock"] {
     box-shadow: none !important;
 }
 
-/* Native st.dataframe Styling Overrides: No colored header row, thin grey dividers */
+/* Dataframe & Tables */
 div[data-testid="stDataFrame"], div[data-testid="stTable"] {
     border: 1px solid var(--pwa-border) !important;
     border-radius: var(--pwa-radius) !important;
@@ -205,33 +255,29 @@ div[data-testid="stDataFrame"], div[data-testid="stTable"] {
     overflow: hidden !important;
 }
 
-div[data-testid="stDataFrame"] iframe {
-    border-radius: var(--pwa-radius) !important;
-}
-
-/* Pipeline Stage Pill Badges (Grey Outline vs Subtle Fill) */
+/* Pipeline Stage Pill Badges */
 .pwa-pill {
     display: inline-flex;
     align-items: center;
-    padding: 0.12rem 0.45rem;
-    border-radius: var(--pwa-radius);
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--pwa-radius-sm);
     font-family: 'Inter', sans-serif;
-    font-size: 0.75rem;
+    font-size: 0.74rem;
     font-weight: 500;
     line-height: 1.2;
     margin-left: 0.35rem;
 }
 
 .pwa-pill-cached {
-    background-color: var(--pwa-border);
-    color: var(--pwa-text-primary);
-    border: 1px solid var(--pwa-border);
+    background-color: var(--pwa-interactive);
+    color: #FFFFFF;
+    border: 1px solid var(--pwa-interactive);
 }
 
 .pwa-pill-template {
-    background-color: var(--pwa-surface);
+    background-color: var(--pwa-surface-subtle);
     color: var(--pwa-text-primary);
-    border: 1px solid var(--pwa-border);
+    border: 1px solid var(--pwa-border-strong);
 }
 
 .pwa-pill-llm {
@@ -243,36 +289,37 @@ div[data-testid="stDataFrame"] iframe {
 /* Quiet Metadata Text */
 .pwa-quiet-meta {
     font-family: 'Inter', sans-serif;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     font-weight: 400;
     color: var(--pwa-text-secondary);
 }
 
-/* Chat Input Box: Flat 1px border, 4px radius, no shadow, #2B2B2B focus ring */
+/* Bottom Chat Input Box */
 div[data-testid="stChatInput"] {
-    max-width: 700px !important;
+    max-width: 760px !important;
     margin: 0 auto !important;
-    background-color: var(--pwa-bg) !important;
-    border: 1px solid var(--pwa-border) !important;
+    background-color: #FFFFFF !important;
+    border: 1px solid var(--pwa-border-strong) !important;
     border-radius: var(--pwa-radius) !important;
-    box-shadow: none !important;
-    padding: 0.25rem 0.5rem !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+    padding: 0.35rem 0.65rem !important;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 div[data-testid="stChatInput"]:focus-within {
     border-color: var(--pwa-interactive) !important;
-    outline: 1.5px solid var(--pwa-interactive) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
 }
 
 div[data-testid="stChatInput"] textarea {
     font-family: 'Inter', sans-serif !important;
-    font-size: 0.92rem !important;
+    font-size: 0.93rem !important;
     font-weight: 400 !important;
     color: var(--pwa-text-primary) !important;
 }
 
 div[data-testid="stChatInput"] textarea::placeholder {
-    color: var(--pwa-text-secondary) !important;
+    color: var(--pwa-text-tertiary) !important;
 }
 
 div[data-testid="stChatInput"] button {
@@ -281,22 +328,30 @@ div[data-testid="stChatInput"] button {
     border: none !important;
 }
 
-div[data-testid="stChatInput"] button:hover {
+/* ─── Streamlit Alerts (Info, Warning, Success, Error) Monochrome Override ─ */
+div[data-testid="stAlert"], .stAlert {
+    background-color: var(--pwa-surface) !important;
     color: var(--pwa-text-primary) !important;
+    border: 1px solid var(--pwa-border-strong) !important;
+    border-radius: var(--pwa-radius) !important;
 }
 
-/* Rejection/Error Box: Monochrome 1px border, no colored alert styles */
+div[data-testid="stAlert"] svg, .stAlert svg {
+    fill: var(--pwa-text-primary) !important;
+}
+
+/* Rejection/Error Box */
 .pwa-error-box {
     border: 1px solid var(--pwa-text-primary);
     background-color: var(--pwa-surface);
     border-radius: var(--pwa-radius);
-    padding: 0.8rem 1rem;
-    margin: 0.4rem 0;
+    padding: 0.85rem 1.05rem;
+    margin: 0.5rem 0;
 }
 
 .pwa-error-title {
     font-family: 'Inter', sans-serif;
-    font-weight: 500;
+    font-weight: 600;
     font-size: 0.88rem;
     color: var(--pwa-text-primary);
     margin-bottom: 0.3rem;
@@ -312,27 +367,27 @@ div[data-testid="stChatInput"] button:hover {
 /* Thinking Indicator */
 .pwa-thinking {
     font-family: 'Inter', sans-serif;
-    font-size: 0.84rem;
+    font-size: 0.85rem;
     font-weight: 400;
     color: var(--pwa-text-secondary);
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0;
+    gap: 0.55rem;
+    padding: 0.5rem 0;
 }
 
 .pwa-thinking-dot {
-    width: 5px;
-    height: 5px;
+    width: 6px;
+    height: 6px;
     background-color: var(--pwa-interactive);
     border-radius: 50%;
     animation: pwa-pulse 1.2s infinite ease-in-out;
 }
 
 @keyframes pwa-pulse {
-    0% { opacity: 0.2; }
-    50% { opacity: 1; }
-    100% { opacity: 0.2; }
+    0% { opacity: 0.2; transform: scale(0.9); }
+    50% { opacity: 1; transform: scale(1.1); }
+    100% { opacity: 0.2; transform: scale(0.9); }
 }
 </style>
 """

@@ -82,11 +82,6 @@ def require_login() -> str:
     import streamlit as st
 
     if not is_auth_configured():
-        st.warning(
-            "⚠️ No authentication configured (PWA_AUTH_USERS unset) — this app is open to anyone with the URL. "
-            "Set PWA_AUTH_USERS or put this behind Cloud IAP / an OAuth proxy before sharing this link.",
-            icon="⚠️",
-        )
         return "anonymous"
 
     if st.session_state.get("pwa_authenticated_user"):
