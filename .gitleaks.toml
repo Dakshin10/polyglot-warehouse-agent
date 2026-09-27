@@ -1,0 +1,16 @@
+title = "Gitleaks Configuration for Polyglot Warehouse Agent"
+
+[allowlist]
+description = "Global allowlist for documentation, tests, and example files"
+files = [
+  '''^\.env\.example$''',
+  '''^tests/.*''',
+  '''^docs/.*''',
+  '''^README\.md$'''
+]
+regexes = [
+  '''YOUR_[A-Z0-9_]+''',
+  '''your_[a-z0-9_]+''',
+  '''example''',
+  '''test_[a-zA-Z0-9_]+'''
+]
