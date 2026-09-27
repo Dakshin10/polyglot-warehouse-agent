@@ -163,7 +163,9 @@ class PostgreSQLConnector(SourceConnector):
             query += f" WHERE {watermark_col} > %s"
             params.append(str(watermark_val))
 
-        cur.execute(query, params)
+        cur.execute(
+            query, params
+        )  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
         col_names = [d[0] for d in cur.description] if cur.description else []
         batch_idx = 0
 

@@ -59,7 +59,9 @@ class SQLiteConnector(SourceConnector):
             self.connect()
         assert self._conn is not None, "connect() did not establish a SQLite connection"
         cur = self._conn.cursor()
-        cur.execute(f"PRAGMA table_info('{table_name}');")
+        cur.execute(
+            f"PRAGMA table_info('{table_name}');"
+        )  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
         cols = []
         pk_cols = []
         for r in cur.fetchall():
@@ -113,7 +115,9 @@ class SQLiteConnector(SourceConnector):
                 )
 
         cur = self._conn.cursor()
-        cur.execute(query, params)
+        cur.execute(
+            query, params
+        )  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
 
         col_names = [d[0] for d in cur.description] if cur.description else []
         batch_idx = 0

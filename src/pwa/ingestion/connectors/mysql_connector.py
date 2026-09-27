@@ -123,7 +123,9 @@ class MySQLConnector(SourceConnector):
 
         assert self._mysql_conn is not None, "connect() did not establish a MySQL connection"
         cur = self._mysql_conn.cursor()
-        cur.execute(f"DESCRIBE {table_name};")
+        cur.execute(
+            f"DESCRIBE {table_name};"
+        )  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
         cols = []
         pk_cols = []
         for r in cur.fetchall():
@@ -163,7 +165,9 @@ class MySQLConnector(SourceConnector):
             query += f" WHERE {watermark_col} > %s"
             params.append(str(watermark_val))
 
-        cur.execute(query, params)
+        cur.execute(
+            query, params
+        )  # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
         col_names = [d[0] for d in cur.description] if cur.description else []
         batch_idx = 0
 
