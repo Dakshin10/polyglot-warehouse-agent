@@ -7,12 +7,10 @@ are mocked.  No live cloud or local-file access required.
 from __future__ import annotations
 
 import sqlite3
-import tempfile
 import uuid
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Generator
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -21,7 +19,6 @@ from pwa.ingestion.connectors.base import (
     BatchResult,
     SchemaColumn,
     TableSchema,
-    SourceConnector,
     get_connector_for_source,
 )
 from pwa.ingestion.connectors.sqlite_connector import SQLiteConnector
@@ -34,20 +31,15 @@ from pwa.ingestion.extractor import TableExtractor, compute_effective_watermark
 # Helpers / shared fixtures
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @pytest.fixture()
 def tmp_sqlite_db(tmp_path: Path) -> Path:
     """Create a minimal SQLite DB with a test table and an update trigger."""
     db_file = tmp_path / "test.sqlite"
     con = sqlite3.connect(db_file)
-    con.execute(
-        "CREATE TABLE orders (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT)"
-    )
-    con.execute(
-        "INSERT INTO orders VALUES (1, 'Widget', '2026-01-01T00:00:00')"
-    )
-    con.execute(
-        "INSERT INTO orders VALUES (2, 'Gadget', '2026-06-01T00:00:00')"
-    )
+    con.execute("CREATE TABLE orders (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT)")
+    con.execute("INSERT INTO orders VALUES (1, 'Widget', '2026-01-01T00:00:00')")
+    con.execute("INSERT INTO orders VALUES (2, 'Gadget', '2026-06-01T00:00:00')")
     # Add a proper AFTER UPDATE trigger so has_update_trigger() returns True
     con.execute(
         """
@@ -66,6 +58,7 @@ def tmp_sqlite_db(tmp_path: Path) -> Path:
 # ═══════════════════════════════════════════════════════════════════════════════
 # base.py
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestTableSchema:
     """Covers lines 30-33 — TableSchema.get_column()."""
@@ -127,8 +120,9 @@ class TestGetConnectorFactory:
         assert isinstance(connector, SQLiteConnector)
 
     def test_db_path_from_config_dict(self):
-        src = self._src(name="d1_source", db_type="sqlite", local_path=None,
-                        config={"local_path": "data/db/d1/some.sqlite"})
+        src = self._src(
+            name="d1_source", db_type="sqlite", local_path=None, config={"local_path": "data/db/d1/some.sqlite"}
+        )
         connector = get_connector_for_source(src)
         assert isinstance(connector, SQLiteConnector)
 
@@ -136,6 +130,7 @@ class TestGetConnectorFactory:
 # ═══════════════════════════════════════════════════════════════════════════════
 # sqlite_connector.py
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestSQLiteConnectorConnect:
     """Covers lines 26, 33 — connect() + string config shorthand."""
@@ -249,9 +244,7 @@ class TestSQLiteExtractWatermarkBranch:
         connector = SQLiteConnector("wm", {"local_path": str(tmp_sqlite_db)})
         # updated_at trigger exists — WHERE clause should be applied
         batches = list(
-            connector.extract("orders", batch_size=100,
-                              watermark_col="updated_at",
-                              watermark_val="2026-03-01T00:00:00")
+            connector.extract("orders", batch_size=100, watermark_col="updated_at", watermark_val="2026-03-01T00:00:00")
         )
         # Only the 2026-06-01 row should be returned
         assert len(batches) == 1
@@ -261,12 +254,13 @@ class TestSQLiteExtractWatermarkBranch:
 
     def test_extract_without_trigger_falls_back_to_full_scan(self, tmp_sqlite_db: Path, caplog):
         import logging
+
         connector = SQLiteConnector("wm_fb", {"local_path": str(tmp_sqlite_db)})
         with caplog.at_level(logging.WARNING, logger="pwa.connectors.sqlite"):
             batches = list(
-                connector.extract("orders", batch_size=100,
-                                  watermark_col="nonexistent_wm",
-                                  watermark_val="2026-03-01T00:00:00")
+                connector.extract(
+                    "orders", batch_size=100, watermark_col="nonexistent_wm", watermark_val="2026-03-01T00:00:00"
+                )
             )
         # Full scan — both rows returned
         total_rows = sum(len(b.df) for b in batches)
@@ -296,6 +290,7 @@ class TestSQLiteExtractWatermarkBranch:
 # ═══════════════════════════════════════════════════════════════════════════════
 # postgres_connector.py  — mocked psycopg2 (no live PG needed)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestPostgreSQLConnectorFallback:
     """Covers lines 56-60 — fallback connect() path when credentials missing."""
@@ -352,8 +347,7 @@ class TestPostgreSQLConnectorDirectPsycopg2:
         """Return a connector already 'connected' via a mocked _pg_conn."""
         connector = PostgreSQLConnector(
             "pg_direct",
-            {"host": "fake-host", "port": 5432, "database": "testdb",
-             "user": "testuser", "password": "pw"},
+            {"host": "fake-host", "port": 5432, "database": "testdb", "user": "testuser", "password": "pw"},
         )
         mock_conn = MagicMock()
         connector._pg_conn = mock_conn
@@ -422,9 +416,7 @@ class TestPostgreSQLConnectorDirectPsycopg2:
         mock_conn.cursor.return_value = mock_cur
 
         batches = list(
-            connector.extract("customers", batch_size=100,
-                              watermark_col="updated_at",
-                              watermark_val="2026-08-01")
+            connector.extract("customers", batch_size=100, watermark_col="updated_at", watermark_val="2026-08-01")
         )
         # Watermark param was passed
         call_args = mock_cur.execute.call_args
@@ -471,8 +463,7 @@ class TestPostgreSQLConnectorDirectPsycopg2:
     def test_connect_psycopg2_success_sets_is_connected(self):
         """Line 73: psycopg2 connect success path."""
         connector = PostgreSQLConnector(
-            "pg_succ",
-            {"host": "valid-host", "port": 5432, "database": "db", "user": "u", "password": "p"}
+            "pg_succ", {"host": "valid-host", "port": 5432, "database": "db", "user": "u", "password": "p"}
         )
         mock_psycopg2 = MagicMock()
         mock_conn = MagicMock()
@@ -489,8 +480,7 @@ class TestPostgreSQLConnectorDirectPsycopg2:
         from pwa.settings import ProductionEnvironmentError
 
         connector = PostgreSQLConnector(
-            "pg_prod_fail",
-            {"host": "valid-host", "port": 5432, "database": "db", "user": "u", "password": "p"}
+            "pg_prod_fail", {"host": "valid-host", "port": 5432, "database": "db", "user": "u", "password": "p"}
         )
         mock_psycopg2 = MagicMock()
         mock_psycopg2.connect.side_effect = Exception("connection failed")
@@ -507,7 +497,14 @@ class TestPostgreSQLConnectorDirectPsycopg2:
         """Line 88: psycopg2 connect fails in dev mode with non-existent fallback file."""
         connector = PostgreSQLConnector(
             "pg_no_fb",
-            {"host": "valid-host", "port": 5432, "database": "db", "user": "u", "password": "p", "local_path": "/nonexistent/path/db.sqlite"}
+            {
+                "host": "valid-host",
+                "port": 5432,
+                "database": "db",
+                "user": "u",
+                "password": "p",
+                "local_path": "/nonexistent/path/db.sqlite",
+            },
         )
         mock_psycopg2 = MagicMock()
         mock_psycopg2.connect.side_effect = Exception("conn failed")
@@ -524,9 +521,14 @@ class TestPostgreSQLConnectorDirectPsycopg2:
         """lines 80-86: psycopg2 import OK but connect() raises → SQLite fallback."""
         connector = PostgreSQLConnector(
             "pg_retry",
-            {"host": "bad-host", "port": 5432, "database": "db",
-             "user": "u", "password": "p",
-             "local_path": str(tmp_sqlite_db)},
+            {
+                "host": "bad-host",
+                "port": 5432,
+                "database": "db",
+                "user": "u",
+                "password": "p",
+                "local_path": str(tmp_sqlite_db),
+            },
         )
 
         mock_psycopg2 = MagicMock()
@@ -574,6 +576,7 @@ class TestPostgreSQLConnectorDirectPsycopg2:
 # ═══════════════════════════════════════════════════════════════════════════════
 # mysql_connector.py — mocked mysql.connector
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestMySQLConnectorFallback:
     """Covers lines 56-86 — fallback connect() path when credentials missing."""
@@ -628,8 +631,7 @@ class TestMySQLConnectorDirectClient:
     def _make_connected_mysql(self) -> tuple[MySQLConnector, MagicMock]:
         connector = MySQLConnector(
             "mysql_direct",
-            {"host": "fake-host", "port": 3306, "database": "testdb",
-             "user": "testuser", "password": "pw"},
+            {"host": "fake-host", "port": 3306, "database": "testdb", "user": "testuser", "password": "pw"},
         )
         mock_conn = MagicMock()
         connector._mysql_conn = mock_conn
@@ -695,9 +697,7 @@ class TestMySQLConnectorDirectClient:
         mock_conn.cursor.return_value = mock_cur
 
         batches = list(
-            connector.extract("customers", batch_size=100,
-                              watermark_col="updated_at",
-                              watermark_val="2026-08-01")
+            connector.extract("customers", batch_size=100, watermark_col="updated_at", watermark_val="2026-08-01")
         )
         call_args = mock_cur.execute.call_args
         assert "WHERE updated_at > %s" in call_args[0][0]
@@ -735,8 +735,7 @@ class TestMySQLConnectorDirectClient:
     def test_connect_mysql_success_sets_is_connected(self):
         """Line 73: mysql.connector connect success path."""
         connector = MySQLConnector(
-            "mysql_succ",
-            {"host": "valid-host", "port": 3306, "database": "db", "user": "u", "password": "p"}
+            "mysql_succ", {"host": "valid-host", "port": 3306, "database": "db", "user": "u", "password": "p"}
         )
         mock_mysql_mod = MagicMock()
         mock_conn = MagicMock()
@@ -753,8 +752,7 @@ class TestMySQLConnectorDirectClient:
         from pwa.settings import ProductionEnvironmentError
 
         connector = MySQLConnector(
-            "mysql_prod_fail",
-            {"host": "valid-host", "port": 3306, "database": "db", "user": "u", "password": "p"}
+            "mysql_prod_fail", {"host": "valid-host", "port": 3306, "database": "db", "user": "u", "password": "p"}
         )
         mock_mysql_mod = MagicMock()
         mock_mysql_mod.connector.connect.side_effect = Exception("mysql connection failed")
@@ -771,7 +769,14 @@ class TestMySQLConnectorDirectClient:
         """Line 86: mysql.connector connect fails in dev mode with non-existent fallback file."""
         connector = MySQLConnector(
             "mysql_no_fb",
-            {"host": "valid-host", "port": 3306, "database": "db", "user": "u", "password": "p", "local_path": "/nonexistent/path/db.sqlite"}
+            {
+                "host": "valid-host",
+                "port": 3306,
+                "database": "db",
+                "user": "u",
+                "password": "p",
+                "local_path": "/nonexistent/path/db.sqlite",
+            },
         )
         mock_mysql_mod = MagicMock()
         mock_mysql_mod.connector.connect.side_effect = Exception("mysql conn failed")
@@ -788,9 +793,14 @@ class TestMySQLConnectorDirectClient:
         """Lines 80-84: mysql.connector raises → SQLite fallback."""
         connector = MySQLConnector(
             "mysql_retry",
-            {"host": "bad-host", "port": 3306, "database": "db",
-             "user": "u", "password": "p",
-             "local_path": str(tmp_sqlite_db)},
+            {
+                "host": "bad-host",
+                "port": 3306,
+                "database": "db",
+                "user": "u",
+                "password": "p",
+                "local_path": str(tmp_sqlite_db),
+            },
         )
 
         mock_mysql_mod = MagicMock()
@@ -801,8 +811,7 @@ class TestMySQLConnectorDirectClient:
             mock_settings = MagicMock()
             mock_settings.is_production = False
             mock_gs.return_value = mock_settings
-            with patch.dict("sys.modules", {"mysql": mock_mysql_mod,
-                                            "mysql.connector": mock_mysql_mod.connector}):
+            with patch.dict("sys.modules", {"mysql": mock_mysql_mod, "mysql.connector": mock_mysql_mod.connector}):
                 connector.connect()
 
         assert connector.is_connected is True
@@ -836,6 +845,7 @@ class TestMySQLConnectorDirectClient:
 # ═══════════════════════════════════════════════════════════════════════════════
 # extractor.py  — compute_effective_watermark + TableExtractor
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestComputeEffectiveWatermark:
     """Covers lines 22, 27-28, 35."""
@@ -920,12 +930,14 @@ class TestTableExtractor:
         connector = self._make_mock_connector([df1])
         extractor = TableExtractor(connector)
 
-        list(extractor.extract_table(
-            "t",
-            watermark_col="updated_at",
-            watermark_val="2026-09-01T10:00:00",
-            lookback_minutes=60,
-        ))
+        list(
+            extractor.extract_table(
+                "t",
+                watermark_col="updated_at",
+                watermark_val="2026-09-01T10:00:00",
+                lookback_minutes=60,
+            )
+        )
 
         call_kwargs = connector.extract.call_args[1]
         # effective watermark should be 60 min before 10:00 = 09:00

@@ -1,9 +1,8 @@
 """Tests for Task 1 — Verifying mock data labeling across QueryResult, AnalyticalAnswer, PipelineResult, and AnswerSynthesisAgent."""
 
-import pytest
 from pwa.semantic.result_contract import QueryResult, SemanticQueryEngine
 from pwa.agent.pipeline.exec_agent import ValidationExecutionAgent
-from pwa.agent.pipeline.answer_agent import AnswerSynthesisAgent, AnalyticalAnswer
+from pwa.agent.pipeline.answer_agent import AnswerSynthesisAgent
 from pwa.agent.pipeline.orchestrator import MultiAgentPipelineOrchestrator, PipelineResult
 
 
@@ -32,6 +31,7 @@ def test_semantic_query_engine_mock_flag():
     assert engine.writer.mock is True
 
     from pwa.semantic.query_planner import AnalyticalIntent
+
     intent = AnalyticalIntent(entities=["fact_sales_order"], measures=["revenue"])
     res = engine.execute_intent(intent)
 

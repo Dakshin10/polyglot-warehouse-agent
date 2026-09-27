@@ -1,12 +1,13 @@
 """Real embedding probe: check API key availability and compute real cosine similarities."""
+
 import os
 import math
 
 # --- 1. API key check ---
 gemini_key = os.getenv("GEMINI_API_KEY")
 google_key = os.getenv("GOOGLE_API_KEY")
-groq_key   = os.getenv("GROQ_API_KEY")
-any_key    = gemini_key or google_key or groq_key
+groq_key = os.getenv("GROQ_API_KEY")
+any_key = gemini_key or google_key or groq_key
 
 print("=== API Key Availability ===")
 print(f"GEMINI_API_KEY : {'SET (len=' + str(len(gemini_key)) + ')' if gemini_key else 'NOT SET'}")
@@ -21,8 +22,8 @@ if not any_key:
     raise SystemExit(0)
 
 # --- 2. Import and call the real get_dense_embedding ---
-from pwa.agent.models import get_dense_embedding
-from pwa.agent.pipeline.schema_agent import _CATALOG_SEMANTIC_DESCRIPTIONS
+from pwa.agent.models import get_dense_embedding  # noqa: E402
+from pwa.agent.pipeline.schema_agent import _CATALOG_SEMANTIC_DESCRIPTIONS  # noqa: E402
 
 QUERIES = [
     "how much stuff do we have sitting around",
@@ -34,14 +35,16 @@ TARGET_ENTITIES = [
     "fact_inventory",
     "fact_purchase_order",
     "fact_marketing_lead",
-    "fact_closed_deal",   # the real-world confusable case
+    "fact_closed_deal",  # the real-world confusable case
 ]
 
+
 def cosine(a, b):
-    dot  = sum(x * y for x, y in zip(a, b))
-    na   = math.sqrt(sum(x * x for x in a))
-    nb   = math.sqrt(sum(y * y for y in b))
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
     return dot / (na * nb) if (na > 0 and nb > 0) else 0.0
+
 
 print("=== Fetching query embeddings ===")
 query_vecs = {}

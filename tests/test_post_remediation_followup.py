@@ -3,7 +3,6 @@
 import pandas as pd
 import pytest
 from pwa.agent.pipeline.exec_agent import _extract_source_tables
-from pwa.agent.pipeline.orchestrator import run_query, run_query_verbose
 from pwa.agent.router import QueryCategory, QueryRouter
 from pwa.agent.semantic_cache import semantic_cache
 from pwa.quality.quality_gates import Phase1QualityFramework, QualityGateException
@@ -54,7 +53,6 @@ def test_task1_analytical_queries_with_drop_allowed():
         assert decision.category != QueryCategory.UNSUPPORTED, f"Query '{q}' should NOT be classified UNSUPPORTED"
 
 
-
 # ─── Task 2: PII Masking Order Before Caching ────────────────────────────────
 
 
@@ -91,7 +89,9 @@ def test_task2_pii_masking_before_caching_two_pass():
         patch.object(orch.router, "route") as mock_route,
         patch.object(orch.fast_path, "match_and_execute", return_value=None),
         patch.object(orch.grounding_agent, "ground_question") as mock_ground,
-        patch.object(orch.sql_agent, "generate_sql_from_intent", return_value="SELECT email, phone FROM customer_orders"),
+        patch.object(
+            orch.sql_agent, "generate_sql_from_intent", return_value="SELECT email, phone FROM customer_orders"
+        ),
         patch.object(orch.exec_agent, "validate_and_execute", return_value=raw_query_res),
     ):
         mock_route.return_value = MagicMock(category=MagicMock(value="ANALYTICAL"), workflow_template_hint=None)
@@ -118,7 +118,7 @@ def test_task2_pii_masking_before_caching_two_pass():
 
 def test_task3_federated_external_query_lineage_extraction():
     federated_sql = """
-    SELECT 
+    SELECT
         o.order_id,
         o.order_date,
         c.customer_name,

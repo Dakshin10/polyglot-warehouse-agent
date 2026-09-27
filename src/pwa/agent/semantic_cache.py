@@ -72,9 +72,7 @@ def _cosine_similarity(a: Counter, b: Counter) -> float:
     return dot / (norm_a * norm_b)
 
 
-_NEGATION_TERMS = re.compile(
-    r"\b(not|outside|except|excluding|without|other than|non|neither|nor)\b", re.IGNORECASE
-)
+_NEGATION_TERMS = re.compile(r"\b(not|outside|except|excluding|without|other than|non|neither|nor)\b", re.IGNORECASE)
 
 
 def _has_negation_mismatch(q1: str, q2: str) -> bool:

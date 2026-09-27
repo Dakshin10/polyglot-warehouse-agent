@@ -5,7 +5,6 @@ import pathlib
 from pwa.agent.schema_cache import _CACHE_DIR
 from pwa.agent.semantic_cache import semantic_cache
 from pwa.cache_manager import (
-    clear_all_caches,
     clear_caches,
     clear_catalog_cache,
     clear_connections_cache,

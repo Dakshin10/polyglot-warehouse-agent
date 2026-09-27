@@ -1,27 +1,24 @@
 """Unit tests for PWA Smart Cache Invalidation engine."""
 
-import os
 import pandas as pd
-from unittest.mock import patch
 
 from pwa.agent.semantic_cache import semantic_cache
 from pwa.smart_cache import (
     SyncStateStore,
     compute_table_signal,
-    detect_table_changes,
     evaluate_and_invalidate_cache,
 )
 
 
 def test_compute_table_signal():
     """Verify table signal computation from DataFrame."""
-    df = pd.DataFrame([
-        {"id": 1, "name": "Alice", "updated_at": "2026-09-16T10:00:00Z"},
-        {"id": 2, "name": "Bob", "updated_at": "2026-09-16T11:00:00Z"},
-    ])
-    signal = compute_table_signal(
-        df, table_name="dim_customer", watermark_col="updated_at", primary_key_cols=["id"]
+    df = pd.DataFrame(
+        [
+            {"id": 1, "name": "Alice", "updated_at": "2026-09-16T10:00:00Z"},
+            {"id": 2, "name": "Bob", "updated_at": "2026-09-16T11:00:00Z"},
+        ]
     )
+    signal = compute_table_signal(df, table_name="dim_customer", watermark_col="updated_at", primary_key_cols=["id"])
 
     assert signal["table_name"] == "dim_customer"
     assert signal["row_count"] == 2
@@ -36,9 +33,7 @@ def test_smart_invalidation_flow(tmp_path, monkeypatch):
     state_file = tmp_path / "sync_state.json"
     store = SyncStateStore(state_file=state_file)
 
-    df1 = pd.DataFrame([
-        {"id": 1, "val": "A", "updated_at": "2026-09-16T10:00:00Z"}
-    ])
+    df1 = pd.DataFrame([{"id": 1, "val": "A", "updated_at": "2026-09-16T10:00:00Z"}])
     sig1 = compute_table_signal(df1, "test_table", watermark_col="updated_at")
     signals1 = {"test_table": sig1}
 
@@ -58,10 +53,12 @@ def test_smart_invalidation_flow(tmp_path, monkeypatch):
     assert len(semantic_cache._entries) >= 1  # Cache preserved!
 
     # 3. Third run with UPDATED data (watermark advanced + new row)
-    df2 = pd.DataFrame([
-        {"id": 1, "val": "A", "updated_at": "2026-09-16T10:00:00Z"},
-        {"id": 2, "val": "B", "updated_at": "2026-09-16T12:00:00Z"},
-    ])
+    df2 = pd.DataFrame(
+        [
+            {"id": 1, "val": "A", "updated_at": "2026-09-16T10:00:00Z"},
+            {"id": 2, "val": "B", "updated_at": "2026-09-16T12:00:00Z"},
+        ]
+    )
     sig2 = compute_table_signal(df2, "test_table", watermark_col="updated_at")
     signals2 = {"test_table": sig2}
 

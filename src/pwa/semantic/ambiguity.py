@@ -105,8 +105,7 @@ class AmbiguityModel:
                 is_ambiguous=True,
                 possible_interpretations=[c[0] for c in candidates[:3]],
                 clarification_message=(
-                    f"Low confidence matching '{top1_name}'. "
-                    f"Did you mean: {', '.join(c[0] for c in candidates[:3])}?"
+                    f"Low confidence matching '{top1_name}'. Did you mean: {', '.join(c[0] for c in candidates[:3])}?"
                 ),
             )
 
@@ -118,10 +117,8 @@ class AmbiguityModel:
                     is_ambiguous=True,
                     possible_interpretations=[top1_name, top2_name],
                     clarification_message=(
-                        f"Your question could refer to either '{top1_name}' or '{top2_name}'. "
-                        f"Which one did you mean?"
+                        f"Your question could refer to either '{top1_name}' or '{top2_name}'. Which one did you mean?"
                     ),
                 )
 
         return AmbiguityResult(term=top1_name, is_ambiguous=False)
-

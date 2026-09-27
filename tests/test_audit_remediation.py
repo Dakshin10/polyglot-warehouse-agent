@@ -8,7 +8,7 @@ import pytest
 from pwa.agent.conversation import ConversationContext
 from pwa.agent.fast_path import FastPathExecutor
 from pwa.agent.pipeline.answer_agent import AnswerSynthesisAgent, synthesize_answer
-from pwa.agent.pipeline.exec_agent import ValidationExecutionAgent, ast_validate_sql
+from pwa.agent.pipeline.exec_agent import ValidationExecutionAgent
 from pwa.agent.pipeline.fallback import run_step_with_fallback
 from pwa.agent.pipeline.orchestrator import (
     MultiAgentPipelineOrchestrator,
@@ -31,7 +31,7 @@ from pwa.observability.alerting import (
     SlackAlertSink,
 )
 from pwa.semantic.query_planner import AnalyticalIntent
-from pwa.semantic.result_contract import QueryResult, SemanticQueryEngine
+from pwa.semantic.result_contract import QueryResult
 
 
 # ---------------------------------------------------------------------------
@@ -186,9 +186,7 @@ def test_9_20_cdc_before_payload():
     prev_df = pd.DataFrame([{"id": 1, "status": "PENDING", "amount": 100}])
     curr_df = pd.DataFrame([{"id": 1, "status": "COMPLETED", "amount": 100, "_pwa_op": "UPDATE"}])
 
-    events = adapter.parse_change_log(
-        curr_df, primary_key_cols=["id"], previous_snapshot=prev_df
-    )
+    events = adapter.parse_change_log(curr_df, primary_key_cols=["id"], previous_snapshot=prev_df)
 
     assert len(events) == 1
     assert events[0].operation == CdcOperation.UPDATE

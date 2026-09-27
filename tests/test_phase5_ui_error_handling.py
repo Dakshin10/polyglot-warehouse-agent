@@ -1,6 +1,6 @@
 """Unit tests for Phase 5 UI exception handling."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 import pandas as pd
 from pwa.ui.components.evidence_panel import render_evidence_panel
 from pwa.ui.components.viz_panel import render_viz_panel

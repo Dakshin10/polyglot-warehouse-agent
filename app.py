@@ -181,7 +181,9 @@ def _render_assistant_result(
         return
 
     is_mock = getattr(result, "is_mock", False) or (isinstance(result, dict) and result.get("is_mock", False))
-    data_source = getattr(result, "data_source", "bigquery") or (result.get("data_source") if isinstance(result, dict) else "bigquery")
+    data_source = getattr(result, "data_source", "bigquery") or (
+        result.get("data_source") if isinstance(result, dict) else "bigquery"
+    )
     if is_mock or data_source in ("stub", "local_sqlite"):
         st.warning(f"⚠️ No live data source configured — showing placeholder values (data_source: `{data_source}`)")
 

@@ -25,6 +25,7 @@ from pwa.agent.pipeline.schema_agent import GroundingAgent, _CATALOG_SEMANTIC_DE
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _cosine(a: list[float], b: list[float]) -> float:
     dot = sum(x * y for x, y in zip(a, b))
     na = math.sqrt(sum(x * x for x in a))
@@ -35,6 +36,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
 # ---------------------------------------------------------------------------
 # Test 1: arithmetic correctness only — mock vectors, no real API
 # ---------------------------------------------------------------------------
+
 
 def test_cosine_similarity_selects_highest_scoring_entity():
     """Validate that GroundingAgent's cosine-similarity comparison selects the
@@ -50,13 +52,13 @@ def test_cosine_similarity_selects_highest_scoring_entity():
     # Orthogonal unit basis vectors — perfect separation, no ambiguity possible.
     vectors = {
         "how much stuff do we have sitting around": [1.0, 0.0, 0.0, 0.0],
-        "money we paid vendors":                   [0.0, 1.0, 0.0, 0.0],
-        "folks who reached out about buying":      [0.0, 0.0, 1.0, 0.0],
+        "money we paid vendors": [0.0, 1.0, 0.0, 0.0],
+        "folks who reached out about buying": [0.0, 0.0, 1.0, 0.0],
     }
     entity_vectors = {
-        "fact_inventory":       [1.0, 0.0, 0.0, 0.0],
-        "fact_purchase_order":  [0.0, 1.0, 0.0, 0.0],
-        "fact_marketing_lead":  [0.0, 0.0, 1.0, 0.0],
+        "fact_inventory": [1.0, 0.0, 0.0, 0.0],
+        "fact_purchase_order": [0.0, 1.0, 0.0, 0.0],
+        "fact_marketing_lead": [0.0, 0.0, 1.0, 0.0],
     }
 
     def mock_embedding(text):
@@ -78,12 +80,9 @@ def test_cosine_similarity_selects_highest_scoring_entity():
             ("folks who reached out about buying", "fact_marketing_lead"),
         ]:
             grounded = agent.ground_question(question)
-            assert grounded.clarification_required is False, (
-                f"Cosine comparison failed for '{question}'"
-            )
+            assert grounded.clarification_required is False, f"Cosine comparison failed for '{question}'"
             assert expected_entity in grounded.analytical_intent.entities, (
-                f"'{question}' grounded to {grounded.analytical_intent.entities}, "
-                f"expected '{expected_entity}'"
+                f"'{question}' grounded to {grounded.analytical_intent.entities}, expected '{expected_entity}'"
             )
             assert grounded.confidence_score > 0.8, (
                 f"Expected confidence > 0.8 for '{question}', got {grounded.confidence_score}"
@@ -94,16 +93,12 @@ def test_cosine_similarity_selects_highest_scoring_entity():
 # Test 2: real API — requires GEMINI_API_KEY or GOOGLE_API_KEY
 # ---------------------------------------------------------------------------
 
-_EMBEDDING_KEY = (
-    os.getenv("GEMINI_API_KEY")
-    or os.getenv("GOOGLE_API_KEY")
-    or os.getenv("GROQ_API_KEY")
-)
+_EMBEDDING_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GROQ_API_KEY")
 
 ZERO_OVERLAP_CASES = [
-    ("how much stuff do we have sitting around", "fact_inventory",      "fact_closed_deal"),
-    ("money we paid vendors",                   "fact_purchase_order",  "fact_closed_deal"),
-    ("folks who reached out about buying",       "fact_marketing_lead",  "fact_closed_deal"),
+    ("how much stuff do we have sitting around", "fact_inventory", "fact_closed_deal"),
+    ("money we paid vendors", "fact_purchase_order", "fact_closed_deal"),
+    ("folks who reached out about buying", "fact_marketing_lead", "fact_closed_deal"),
 ]
 
 TARGET_ENTITIES = [
@@ -155,8 +150,9 @@ def test_real_embedding_zero_overlap_paraphrases():
 
         print(f"\nQuery: '{question}'")
         for ent, sc in ranked:
-            marker = " <-- expected" if ent == expected_entity else (
-                " <-- confusable" if ent == confusable_entity else "")
+            marker = (
+                " <-- expected" if ent == expected_entity else (" <-- confusable" if ent == confusable_entity else "")
+            )
             print(f"  {ent:<25} : {sc:.6f}{marker}")
 
         top_entity, top_score = ranked[0]
@@ -192,6 +188,7 @@ def test_real_embedding_zero_overlap_paraphrases():
 # Test 3: lexical fallback still confirmed
 # ---------------------------------------------------------------------------
 
+
 def test_zero_overlap_lexical_fallback_limitations():
     """Verify that pure lexical TF-IDF matching fails or requests clarification
     on zero-overlap queries when the dense embedding path is disabled."""
@@ -207,6 +204,5 @@ def test_zero_overlap_lexical_fallback_limitations():
             grounded = agent.ground_question(question)
             # Pure lexical matching with zero vocabulary overlap fails or clarification-gates
             assert (
-                grounded.clarification_required is True
-                or expected_entity not in grounded.analytical_intent.entities
+                grounded.clarification_required is True or expected_entity not in grounded.analytical_intent.entities
             ), f"Question '{question}' surprisingly matched TF-IDF without vocabulary overlap"

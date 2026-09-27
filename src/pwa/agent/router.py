@@ -72,7 +72,9 @@ class QueryRouter:
         # Workflow diagnostic keywords
         self.decline_keywords = re.compile(r"\b(why did|decline|drop|fall|decrease|diagnostic)\b", re.IGNORECASE)
         self.cohort_keywords = re.compile(r"\b(cohort|retention|repeat rate)\b", re.IGNORECASE)
-        self.funnel_keywords = re.compile(r"\b(marketing funnel|funnel analysis|conversion funnel|lead conversion)\b", re.IGNORECASE)
+        self.funnel_keywords = re.compile(
+            r"\b(marketing funnel|funnel analysis|conversion funnel|lead conversion)\b", re.IGNORECASE
+        )
         self.contrib_keywords = re.compile(r"\b(contributed|contribution|drove|drives)\b", re.IGNORECASE)
         self.abc_keywords = re.compile(r"\b(abc classification|pareto|product mix)\b", re.IGNORECASE)
 

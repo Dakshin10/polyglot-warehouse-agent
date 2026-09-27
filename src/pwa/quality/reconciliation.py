@@ -151,13 +151,16 @@ class SourceTargetReconciler:
                             else:
                                 try:
                                     from pwa.connections import get_bq_client
+
                                     client = get_bq_client()
                                     pk_query_col = valid_pks[0] if valid_pks else "id"
                                     query = f"SELECT DISTINCT CAST({pk_query_col} AS STRING) AS pk FROM `nexora_staging.staging_{tbl.name}`"
                                     query_job = client.query(query)
                                     bq_pk_set = {row["pk"] for row in query_job.result()}
                                 except Exception as bq_exc:
-                                    logger.debug(f"[Delete Detection] BigQuery read skipped/mock for `{table_key}`: {bq_exc}")
+                                    logger.debug(
+                                        f"[Delete Detection] BigQuery read skipped/mock for `{table_key}`: {bq_exc}"
+                                    )
                                     bq_pk_set = set()
 
                             # 3. Diff PK sets
@@ -192,6 +195,7 @@ class SourceTargetReconciler:
                 elif source.type == "file":
                     # Handle file/CSV sources (e.g. Kaggle AdventureWorks/Olist)
                     import glob
+
                     for tbl in source.tables:
                         if not tbl.primary_key:
                             continue
@@ -281,4 +285,3 @@ def run_full_reconciliation(sources: Optional[list[str]] = None) -> bool:
         f"{res['deletions_detected']} deletion(s) detected."
     )
     return res.get("status") == "SUCCESS"
-

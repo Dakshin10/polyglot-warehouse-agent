@@ -2,7 +2,7 @@
 
 import pandas as pd
 import pytest
-from pwa.quality.quality_gates import Phase1QualityFramework, QualityGateException, QualityResult
+from pwa.quality.quality_gates import Phase1QualityFramework, QualityGateException
 
 
 def test_quality_gate_exception_raised_on_duplicate_pk():

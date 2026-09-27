@@ -85,7 +85,9 @@ class ValidationExecutionAgent:
                     rows = df.to_dict(orient="records")
                     cols = list(df.columns)
                 except Exception as local_exc:
-                    logger.warning(f"Local SQLite engine direct SQL execution failed, falling back to stub: {local_exc}")
+                    logger.warning(
+                        f"Local SQLite engine direct SQL execution failed, falling back to stub: {local_exc}"
+                    )
                     rows = [{"result_count": 100}]
                     cols = list(rows[0].keys())
                     is_stub = True

@@ -190,4 +190,3 @@ def default_alert_sinks() -> CompositeAlertSink:
         sinks.append(PagerDutyAlertSink(pagerduty_key))
 
     return CompositeAlertSink(sinks)
-

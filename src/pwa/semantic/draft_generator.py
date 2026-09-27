@@ -15,13 +15,31 @@ from pwa.ingestion.connectors.base import TableSchema
 from pwa.settings import REPO_ROOT
 
 _NUMERIC_TYPES = {
-    "int", "integer", "bigint", "smallint", "tinyint",
-    "float", "double", "real", "numeric", "decimal", "number"
+    "int",
+    "integer",
+    "bigint",
+    "smallint",
+    "tinyint",
+    "float",
+    "double",
+    "real",
+    "numeric",
+    "decimal",
+    "number",
 }
 
 _TEXT_TYPES = {
-    "varchar", "char", "text", "string", "nvarchar", "nchar",
-    "date", "timestamp", "datetime", "boolean", "bool"
+    "varchar",
+    "char",
+    "text",
+    "string",
+    "nvarchar",
+    "nchar",
+    "date",
+    "timestamp",
+    "datetime",
+    "boolean",
+    "bool",
 }
 
 
@@ -52,8 +70,24 @@ def generate_catalog_draft(
     pk_cols = [p.lower() for p in table_schema.primary_key]
 
     # Categorize Entity Type
-    if table_name.startswith("fact_") or table_name.startswith("f_") or any(
-        kw in table_name for kw in ("sales", "order", "transaction", "payment", "review", "deal", "lead", "inventory", "header", "detail")
+    if (
+        table_name.startswith("fact_")
+        or table_name.startswith("f_")
+        or any(
+            kw in table_name
+            for kw in (
+                "sales",
+                "order",
+                "transaction",
+                "payment",
+                "review",
+                "deal",
+                "lead",
+                "inventory",
+                "header",
+                "detail",
+            )
+        )
     ):
         entity_type = "fact"
     else:
@@ -71,30 +105,36 @@ def generate_catalog_draft(
         is_key = col.is_pk or _is_pk_or_fk_column(col_name, pk_cols)
 
         if dtype_clean in _NUMERIC_TYPES and not is_key:
-            candidate_measures.append({
-                "name": col_name.lower(),
-                "column": col_name,
-                "aggregation": "SUM",
-                "description": "TODO: needs human review",
-            })
+            candidate_measures.append(
+                {
+                    "name": col_name.lower(),
+                    "column": col_name,
+                    "aggregation": "SUM",
+                    "description": "TODO: needs human review",
+                }
+            )
         else:
-            candidate_dimensions.append({
-                "name": col_name.lower(),
-                "column": col_name,
-                "data_type": col.data_type,
-                "description": "TODO: needs human review",
-            })
+            candidate_dimensions.append(
+                {
+                    "name": col_name.lower(),
+                    "column": col_name,
+                    "data_type": col.data_type,
+                    "description": "TODO: needs human review",
+                }
+            )
 
         # Relationship inference for foreign keys matching target_id pattern
         if col_name.lower().endswith("_id") and not (col.is_pk or col_name.lower() in pk_cols):
             target_entity_name = col_name.lower()[:-3]
-            candidate_relationships.append({
-                "source_column": col_name,
-                "target_entity": f"dim_{target_entity_name}",
-                "target_column": col_name,
-                "relationship_type": "MANY_TO_ONE",
-                "description": "TODO: needs human review",
-            })
+            candidate_relationships.append(
+                {
+                    "source_column": col_name,
+                    "target_entity": f"dim_{target_entity_name}",
+                    "target_column": col_name,
+                    "relationship_type": "MANY_TO_ONE",
+                    "description": "TODO: needs human review",
+                }
+            )
 
     return {
         "entity": {

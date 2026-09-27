@@ -61,9 +61,7 @@ def clear_caches(target: str = "all") -> Dict[str, Any]:
     """
     clean_target = (target or "all").lower().strip()
     if clean_target not in VALID_CACHE_TARGETS:
-        raise ValueError(
-            f"Invalid cache target '{target}'. Must be one of: {', '.join(VALID_CACHE_TARGETS)}"
-        )
+        raise ValueError(f"Invalid cache target '{target}'. Must be one of: {', '.join(VALID_CACHE_TARGETS)}")
 
     results: Dict[str, Any] = {}
 

@@ -171,9 +171,7 @@ def inspect_content_pii(text: str) -> list[dict[str, Any]]:
             ],
             "min_likelihood": dlp_v2.Likelihood.LIKELY,
         }
-        response = client.inspect_content(
-            request={"parent": parent, "inspect_config": inspect_config, "item": item}
-        )
+        response = client.inspect_content(request={"parent": parent, "inspect_config": inspect_config, "item": item})
         findings = []
         result_obj = getattr(response, "result", response)
         findings_list = getattr(result_obj, "findings", []) or []
@@ -217,7 +215,7 @@ def apply_bigquery_column_policy_tags(
         if tag.is_pii and tag.policy_tag:
             ddl = (
                 f"ALTER TABLE `{project}.{dataset_id}.{table_name}` "
-                f"ALTER COLUMN `{col}` SET OPTIONS (policy_tags=[\"{tag.policy_tag}\"]);"
+                f'ALTER COLUMN `{col}` SET OPTIONS (policy_tags=["{tag.policy_tag}"]);'
             )
             ddl_statements.append(ddl)
             if not getattr(writer, "mock", False) and getattr(writer, "_client", None) is not None:
@@ -272,4 +270,3 @@ def mask_dataframe_pii(df: Any, mask_levels: list[SensitivityLevel] | None = Non
             df_masked[col] = df_masked[col].apply(_mask_dlp_freetext)
 
     return df_masked
-

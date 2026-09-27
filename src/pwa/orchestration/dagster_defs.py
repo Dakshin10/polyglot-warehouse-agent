@@ -173,4 +173,3 @@ defs = Definitions(
     schedules=[daily_pipeline_schedule, daily_reconciliation_schedule],
     sensors=[pipeline_failure_sensor],
 )
-

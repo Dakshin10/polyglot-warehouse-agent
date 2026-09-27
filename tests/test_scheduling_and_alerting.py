@@ -7,7 +7,9 @@ from pwa.run_source import run_source_pipeline
 
 def test_source_pipeline_dispatches_alert_on_failure():
     with (
-        patch("pwa.preprocessing.adventureworks_ingest.ingest_adventureworks", side_effect=RuntimeError("DB Conn Error")),
+        patch(
+            "pwa.preprocessing.adventureworks_ingest.ingest_adventureworks", side_effect=RuntimeError("DB Conn Error")
+        ),
         patch("pwa.observability.alerting.default_alert_sinks") as mock_sinks_fn,
     ):
         mock_sink = MagicMock()

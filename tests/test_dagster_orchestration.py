@@ -113,5 +113,3 @@ def test_rollup_refresh_asset_dependency():
     """Assert rollup_refresh explicitly depends on warehouse_quality_gates in asset graph."""
     dep_keys = [k.to_user_string() for k in rollup_refresh.keys_by_input.values()]
     assert "warehouse_quality_gates" in dep_keys
-
-

@@ -30,8 +30,7 @@ jobs:
 
       - name: Run Semgrep SAST Security Scan
         run: |
-          pip install semgrep
-          semgrep scan --config p/security --error src/pwa/ingestion/connectors/ src/pwa/agent/
+          pipx run semgrep scan --config auto --error src/pwa/ingestion/connectors/ src/pwa/agent/
 
       - name: Lint with Ruff
         run: |

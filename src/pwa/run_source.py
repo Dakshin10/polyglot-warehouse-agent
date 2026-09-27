@@ -101,7 +101,11 @@ def run_source_pipeline(source_name: str | None = None) -> bool:
                             mock_df,
                             table_name=f"{src.name}.{tbl.name}",
                             watermark_col=tbl.watermark_column,
-                            primary_key_cols=tbl.primary_key if isinstance(tbl.primary_key, list) else [tbl.primary_key] if tbl.primary_key else None,
+                            primary_key_cols=tbl.primary_key
+                            if isinstance(tbl.primary_key, list)
+                            else [tbl.primary_key]
+                            if tbl.primary_key
+                            else None,
                         )
                         signals[f"{src.name}.{tbl.name}"] = signal
 

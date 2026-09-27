@@ -1,6 +1,5 @@
 """Tests for Task 2 — Confidence-scored semantic matching & ambiguity gating."""
 
-import pytest
 from pwa.agent.pipeline.schema_agent import GroundingAgent
 from pwa.semantic.ambiguity import AmbiguityModel
 
@@ -22,7 +21,9 @@ def test_adversarial_paraphrases():
         assert expected_entity in grounded.analytical_intent.entities, (
             f"Question '{question}' grounded to {grounded.analytical_intent.entities}, expected '{expected_entity}'"
         )
-        assert grounded.confidence_score > 0.3, f"Expected confidence > 0.3 for '{question}', got {grounded.confidence_score}"
+        assert grounded.confidence_score > 0.3, (
+            f"Expected confidence > 0.3 for '{question}', got {grounded.confidence_score}"
+        )
         assert grounded.analytical_intent.confidence_score == grounded.confidence_score
 
 
@@ -45,7 +46,9 @@ def test_ambiguity_model_evaluate_candidates():
     close_candidates = [("fact_sales_order", 0.65), ("fact_marketplace_order", 0.61)]
     res = model.evaluate_candidates(close_candidates)
     assert res.is_ambiguous is True
-    assert "fact_sales_order vs fact_marketplace_order" in res.term or "could refer to either" in res.clarification_message
+    assert (
+        "fact_sales_order vs fact_marketplace_order" in res.term or "could refer to either" in res.clarification_message
+    )
 
     # Low confidence candidate (< 0.25)
     low_candidates = [("dim_supplier", 0.15)]

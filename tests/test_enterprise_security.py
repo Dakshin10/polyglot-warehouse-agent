@@ -10,10 +10,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
 from pwa.governance.pii import (
-    PII_FIELD_REGISTRY,
     SensitivityLevel,
     apply_bigquery_column_policy_tags,
     classify_column,
@@ -23,7 +21,6 @@ from pwa.governance.pii import (
 from pwa.settings import (
     EnvSecretProvider,
     GCPSecretManagerProvider,
-    SecretProvider,
     Settings,
 )
 
@@ -31,6 +28,7 @@ from pwa.settings import (
 # ═══════════════════════════════════════════════════════════════════════════════
 # Task 1: Secrets Management
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestSecretsManagement:
     def test_env_secret_provider(self):
@@ -70,6 +68,7 @@ class TestSecretsManagement:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Task 4: Content-Based PII Scanning (Cloud DLP)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestContentBasedPiiScanning:
     def test_pii_field_registry_structured_columns(self):
@@ -175,6 +174,7 @@ class TestContentBasedPiiScanning:
 # Task 5: Warehouse Policy Tag Enforcement
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestBigQueryPolicyTagEnforcement:
     def test_apply_bigquery_column_policy_tags_generates_ddl(self):
         mock_writer = SimpleNamespace(project="pwa-prod", mock=True, _client=None)
@@ -184,5 +184,11 @@ class TestBigQueryPolicyTagEnforcement:
         )
 
         assert len(ddl_statements) == 2  # email and phone have policy tags
-        assert "ALTER TABLE `pwa-prod.staging_enterprise.customers` ALTER COLUMN `email` SET OPTIONS (policy_tags=[" in ddl_statements[0]
-        assert "ALTER TABLE `pwa-prod.staging_enterprise.customers` ALTER COLUMN `phone` SET OPTIONS (policy_tags=[" in ddl_statements[1]
+        assert (
+            "ALTER TABLE `pwa-prod.staging_enterprise.customers` ALTER COLUMN `email` SET OPTIONS (policy_tags=["
+            in ddl_statements[0]
+        )
+        assert (
+            "ALTER TABLE `pwa-prod.staging_enterprise.customers` ALTER COLUMN `phone` SET OPTIONS (policy_tags=["
+            in ddl_statements[1]
+        )

@@ -569,6 +569,7 @@ def cmd_clear_cache(cache_target: str = "all", smart: bool = False) -> int:
             res = inv_res.get("purge_result", {})
         else:
             from pwa.cache_manager import clear_caches
+
             res = clear_caches(target=cache_target)
 
         print(f"\n=== PWA Cache Purge Summary (Target: {cache_target}) ===")
@@ -884,7 +885,9 @@ def cmd_catalog_draft(table_name: str = "", draft_all: bool = False, output_dir:
                 break
 
         if not found:
-            print(f"Warning: Table '{table_name}' not found directly in registered sources registry. Generating generic draft.")
+            print(
+                f"Warning: Table '{table_name}' not found directly in registered sources registry. Generating generic draft."
+            )
             schemas_to_process.append(
                 TableSchema(
                     table_name=table_name,
@@ -971,9 +974,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("all", help="Run the source pipeline then the warehouse pipeline")
     sub.add_parser("refresh-rollups", help="Recompute and materialize BigQuery rollup tables from mart views")
 
-    clear_cache = sub.add_parser(
-        "clear-cache", help="Clear pipeline caches (semantic, schema, catalog, connections)"
-    )
+    clear_cache = sub.add_parser("clear-cache", help="Clear pipeline caches (semantic, schema, catalog, connections)")
     clear_cache.add_argument(
         "--cache",
         choices=["all", "semantic", "schema", "catalog", "connections"],
@@ -1020,7 +1021,9 @@ def build_parser() -> argparse.ArgumentParser:
     cat_draft = sub.add_parser("catalog", help="Auto-generate draft semantic catalog entries from discovered schemas")
     cat_draft.add_argument("action", choices=["draft"], nargs="?", default="draft", help="Sub-action (draft)")
     cat_draft.add_argument("table_name", nargs="?", default="", help="Table name to generate draft for")
-    cat_draft.add_argument("--all", action="store_true", help="Generate drafts for all discovered tables across sources")
+    cat_draft.add_argument(
+        "--all", action="store_true", help="Generate drafts for all discovered tables across sources"
+    )
     cat_draft.add_argument("--output-dir", default="catalog_drafts", help="Output directory for draft YAML files")
 
     return parser

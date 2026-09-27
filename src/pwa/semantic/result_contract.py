@@ -133,7 +133,9 @@ class SemanticQueryEngine:
                     )
                     if not cols:
                         cols = ["result"]
-                    mock_df = pd.DataFrame([{col: "sample_val" if "name" in col or "cat" in col else 100 for col in cols}])
+                    mock_df = pd.DataFrame(
+                        [{col: "sample_val" if "name" in col or "cat" in col else 100 for col in cols}]
+                    )
                     rows = mock_df.to_dict(orient="records")
                     row_cnt = len(rows)
                     data_source_mode = "stub"

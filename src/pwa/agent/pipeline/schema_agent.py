@@ -30,9 +30,28 @@ _DOMAIN_HEURISTICS: list[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]
     (("marketplace seller", "marketplace sellers", "seller", "sellers"), ("dim_marketplace_seller",), (), ()),
     (("marketplace payment", "marketplace payments", "payment", "payments"), ("fact_marketplace_payment",), (), ()),
     (("marketplace review", "marketplace reviews", "review", "reviews"), ("fact_marketplace_review",), (), ()),
-    (("closed deal", "closed deals", "deal", "deals", "sales opportunities", "opportunities won", "deals won", "won deals"), ("fact_closed_deal",), (), ()),
+    (
+        (
+            "closed deal",
+            "closed deals",
+            "deal",
+            "deals",
+            "sales opportunities",
+            "opportunities won",
+            "deals won",
+            "won deals",
+        ),
+        ("fact_closed_deal",),
+        (),
+        (),
+    ),
     (("marketing lead", "marketing leads", "mql", "lead", "leads"), ("fact_marketing_lead",), (), ()),
-    (("revenue", "sales", "sales order total", "order total", "sales total", "freight"), ("fact_sales_order",), (), ("revenue",)),
+    (
+        ("revenue", "sales", "sales order total", "order total", "sales total", "freight"),
+        ("fact_sales_order",),
+        (),
+        ("revenue",),
+    ),
     (("quantity", "quantity of products", "units", "units sold"), ("fact_sales_order_item",), (), ("quantity_sold",)),
     (("sales order item", "sales order items", "line item", "line items"), ("fact_sales_order_item",), (), ()),
     (("category", "subcategory", "subcategories", "color", "product color"), ("dim_product",), ("product",), ()),
@@ -121,7 +140,7 @@ def _vectorize_text(text: str) -> dict[str, float]:
     for w in words:
         c[w] += 1.0
     for i in range(len(words) - 1):
-        c[f"{words[i]}_{words[i+1]}"] += 1.5
+        c[f"{words[i]}_{words[i + 1]}"] += 1.5
     for i in range(len(s) - 2):
         c[s[i : i + 3]] += 0.3
     return c
@@ -208,7 +227,9 @@ class GroundingAgent:
             if cand_ambiguity.is_ambiguous:
                 return GroundedIntent(
                     question=question,
-                    analytical_intent=AnalyticalIntent(confidence_score=candidate_scores[0][1] if candidate_scores else 0.0),
+                    analytical_intent=AnalyticalIntent(
+                        confidence_score=candidate_scores[0][1] if candidate_scores else 0.0
+                    ),
                     confidence="LOW",
                     reasoning=f"Ambiguity/low-confidence in similarity matching: {cand_ambiguity.clarification_message}",
                     ambiguities=cand_ambiguity.possible_interpretations,
@@ -277,7 +298,11 @@ class GroundingAgent:
             confidence_score=confidence_score,
         )
 
-        confidence = "HIGH" if (confidence_score >= 0.75 and matched_entities and (matched_measures or matched_metrics)) else "MEDIUM"
+        confidence = (
+            "HIGH"
+            if (confidence_score >= 0.75 and matched_entities and (matched_measures or matched_metrics))
+            else "MEDIUM"
+        )
         if confidence_score < 0.5:
             confidence = "LOW"
 
@@ -343,7 +368,9 @@ class GroundingAgent:
                     matched_measures.append(m)
 
         # Special-cased: the measure depends on whether "count" also appears.
-        if any(kw in q_lower for kw in ("purchase", "procurement", "paid", "spent", "money")) and any(kw in q_lower for kw in ("vendor", "supplier", "vendors", "suppliers")):
+        if any(kw in q_lower for kw in ("purchase", "procurement", "paid", "spent", "money")) and any(
+            kw in q_lower for kw in ("vendor", "supplier", "vendors", "suppliers")
+        ):
             if "fact_purchase_order" not in matched_entities:
                 matched_entities.append("fact_purchase_order")
             if "dim_supplier" in matched_entities:
@@ -363,7 +390,13 @@ class GroundingAgent:
         # remove enterprise fact_sales_order injected by generic keywords like 'revenue'.
         has_marketplace_entity = any(
             e in matched_entities
-            for e in ("fact_closed_deal", "dim_marketplace_seller", "dim_marketplace_customer", "fact_marketplace_order", "fact_marketing_lead")
+            for e in (
+                "fact_closed_deal",
+                "dim_marketplace_seller",
+                "dim_marketplace_customer",
+                "fact_marketplace_order",
+                "fact_marketing_lead",
+            )
         )
         if has_marketplace_entity and "fact_sales_order" in matched_entities:
             matched_entities.remove("fact_sales_order")

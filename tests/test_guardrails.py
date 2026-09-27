@@ -77,7 +77,9 @@ def test_pipeline_overall_timeout_guard():
         time.sleep(1.0)
         return "Slow Answer"
 
-    with patch("pwa.agent.pipeline.orchestrator.MultiAgentPipelineOrchestrator.run_pipeline", side_effect=mock_slow_stages):
+    with patch(
+        "pwa.agent.pipeline.orchestrator.MultiAgentPipelineOrchestrator.run_pipeline", side_effect=mock_slow_stages
+    ):
         answer = run_query("What was total sales in 2014?", timeout_seconds=0.1)
 
         assert "The query request took too long to complete" in answer

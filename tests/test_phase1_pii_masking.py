@@ -2,7 +2,6 @@
 
 import pandas as pd
 from pwa.governance.pii import (
-    PII_FIELD_REGISTRY,
     SensitivityLevel,
     classify_column,
     get_policy_tag_path,

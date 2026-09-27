@@ -160,9 +160,7 @@ class QueryPlanner:
                 filter_expressions.append(f"{primary_entity.name}.{col} {op} '{val}'")
 
         # 6. Detect Grain Mismatch / Fan-Out Risk
-        fanout_risk, fanout_details = self._detect_fanout_risk(
-            joined_relationships, selected_measures, target_entities
-        )
+        fanout_risk, fanout_details = self._detect_fanout_risk(joined_relationships, selected_measures, target_entities)
 
         if strict_grain_validation and fanout_risk:
             from pwa.agent.errors import SemanticGrainValidationError
@@ -205,22 +203,28 @@ class QueryPlanner:
             if card in ("ONE_TO_MANY", "MANY_TO_MANY"):
                 if rel.source_entity in measure_entity_names and rel.target_entity in target_entity_names:
                     fanout_risk = True
-                    fanout_details.append({
-                        "relationship": rel.name,
-                        "source_entity": rel.source_entity,
-                        "target_entity": rel.target_entity,
-                        "cardinality": card,
-                        "reason": f"Measure from '{rel.source_entity}' will multiply when joined across '{card}' relationship to '{rel.target_entity}'."
-                    })
-                elif len(measure_entity_names) > 1 and (rel.source_entity in measure_entity_names or rel.target_entity in measure_entity_names):
+                    fanout_details.append(
+                        {
+                            "relationship": rel.name,
+                            "source_entity": rel.source_entity,
+                            "target_entity": rel.target_entity,
+                            "cardinality": card,
+                            "reason": f"Measure from '{rel.source_entity}' will multiply when joined across '{card}' relationship to '{rel.target_entity}'.",
+                        }
+                    )
+                elif len(measure_entity_names) > 1 and (
+                    rel.source_entity in measure_entity_names or rel.target_entity in measure_entity_names
+                ):
                     fanout_risk = True
-                    fanout_details.append({
-                        "relationship": rel.name,
-                        "source_entity": rel.source_entity,
-                        "target_entity": rel.target_entity,
-                        "cardinality": card,
-                        "reason": f"Multi-fact measure calculation across '{card}' relationship '{rel.name}'."
-                    })
+                    fanout_details.append(
+                        {
+                            "relationship": rel.name,
+                            "source_entity": rel.source_entity,
+                            "target_entity": rel.target_entity,
+                            "cardinality": card,
+                            "reason": f"Multi-fact measure calculation across '{card}' relationship '{rel.name}'.",
+                        }
+                    )
         return fanout_risk, fanout_details
 
     def _find_relationship_path(self, source_name: str, target_name: str) -> list[Relationship]:
@@ -245,4 +249,3 @@ class QueryPlanner:
                     visited.add(next_node)
                     queue.append((next_node, path + [rel]))
         return []
-

@@ -1,14 +1,10 @@
 """Tests for automated catalog draft scaffolding generation and isolation safeguards."""
 
-import os
-from pathlib import Path
-import pytest
 import yaml
 
 from pwa.ingestion.connectors.base import TableSchema, SchemaColumn
 from pwa.semantic.draft_generator import generate_catalog_draft, save_catalog_draft
 from pwa.semantic.loader import get_semantic_catalog
-from pwa.settings import REPO_ROOT
 
 
 def test_generate_catalog_draft_column_classification():
