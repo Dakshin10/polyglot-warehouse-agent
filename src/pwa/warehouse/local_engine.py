@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import pathlib
 import re
 import sqlite3
 import threading
@@ -53,7 +52,7 @@ class LocalSQLiteEngine:
             curated_ddl = [
                 """
                 CREATE VIEW IF NOT EXISTS dim_employee AS
-                SELECT 
+                SELECT
                     CAST(e.BusinessEntityID AS TEXT) AS employee_id,
                     CONCAT('adventureworks_', e.BusinessEntityID) AS employee_sk,
                     COALESCE(p.FirstName, '') || ' ' || COALESCE(p.LastName, '') AS full_name,
@@ -69,7 +68,7 @@ class LocalSQLiteEngine:
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS dim_department AS
-                SELECT 
+                SELECT
                     CAST(DepartmentID AS TEXT) AS department_id,
                     Name AS department_name,
                     GroupName AS department_group
@@ -77,7 +76,7 @@ class LocalSQLiteEngine:
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS dim_customer AS
-                SELECT 
+                SELECT
                     CAST(c.CustomerID AS TEXT) AS enterprise_customer_id,
                     CAST(c.CustomerID AS TEXT) AS customer_id,
                     CONCAT('adventureworks_', c.CustomerID) AS customer_sk,
@@ -89,7 +88,7 @@ class LocalSQLiteEngine:
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS dim_product AS
-                SELECT 
+                SELECT
                     CAST(p.ProductID AS TEXT) AS enterprise_product_id,
                     CAST(p.ProductID AS TEXT) AS product_id,
                     CONCAT('adventureworks_', p.ProductID) AS product_sk,
@@ -106,14 +105,14 @@ class LocalSQLiteEngine:
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS dim_product_category AS
-                SELECT 
+                SELECT
                     CAST(ProductCategoryID AS TEXT) AS category_id,
                     Name AS category_name
                 FROM productcategory;
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS dim_product_subcategory AS
-                SELECT 
+                SELECT
                     CAST(sc.ProductSubcategoryID AS TEXT) AS subcategory_id,
                     sc.Name AS subcategory_name,
                     cat.Name AS category_name
@@ -122,7 +121,7 @@ class LocalSQLiteEngine:
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS dim_supplier AS
-                SELECT 
+                SELECT
                     CAST(BusinessEntityID AS TEXT) AS vendor_id,
                     CAST(BusinessEntityID AS TEXT) AS supplier_id,
                     CONCAT('adventureworks_vendor_', BusinessEntityID) AS supplier_sk,
@@ -134,7 +133,7 @@ class LocalSQLiteEngine:
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS fact_sales_order AS
-                SELECT 
+                SELECT
                     CAST(SalesOrderID AS TEXT) AS sales_order_id,
                     SalesOrderNumber AS order_number,
                     OrderDate AS order_date,
@@ -150,7 +149,7 @@ class LocalSQLiteEngine:
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS fact_sales_order_item AS
-                SELECT 
+                SELECT
                     CAST(SalesOrderDetailID AS TEXT) AS sales_order_item_id,
                     CAST(SalesOrderID AS TEXT) AS sales_order_id,
                     CAST(ProductID AS TEXT) AS product_id,
@@ -164,7 +163,7 @@ class LocalSQLiteEngine:
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS fact_purchase_order AS
-                SELECT 
+                SELECT
                     CAST(PurchaseOrderID AS TEXT) AS purchase_order_id,
                     CAST(VendorID AS TEXT) AS vendor_id,
                     CAST(EmployeeID AS TEXT) AS employee_id,
@@ -176,7 +175,7 @@ class LocalSQLiteEngine:
                 """,
                 """
                 CREATE VIEW IF NOT EXISTS fact_purchase_order_item AS
-                SELECT 
+                SELECT
                     CAST(PurchaseOrderDetailID AS TEXT) AS purchase_order_item_id,
                     CAST(PurchaseOrderID AS TEXT) AS purchase_order_id,
                     CAST(ProductID AS TEXT) AS product_id,

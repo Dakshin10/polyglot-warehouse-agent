@@ -81,9 +81,10 @@ def run_source_pipeline(source_name: str | None = None) -> bool:
 
     # Step 4: Smart Cache Invalidation (only purge caches if source data changed)
     if all_passed:
-        logger.info("---> STEP 4: EVALUATE SMART CACHE INVALIDATION")
         try:
-            from pwa.smart_cache import evaluate_and_invalidate_cache, compute_table_signal
+            import pandas as pd
+
+            from pwa.smart_cache import compute_table_signal, evaluate_and_invalidate_cache
             from pwa.source_registry import get_registry
 
             registry = get_registry()

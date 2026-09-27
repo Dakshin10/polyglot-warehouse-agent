@@ -79,6 +79,7 @@ class ValidationExecutionAgent:
             if self.engine.writer.mock:
                 from pwa.warehouse.local_engine import get_local_sqlite_engine
 
+                is_stub = False
                 try:
                     df = get_local_sqlite_engine().execute_sql(sql)
                     rows = df.to_dict(orient="records")
@@ -87,6 +88,7 @@ class ValidationExecutionAgent:
                     logger.warning(f"Local SQLite engine direct SQL execution failed, falling back to stub: {local_exc}")
                     rows = [{"result_count": 100}]
                     cols = list(rows[0].keys())
+                    is_stub = True
 
                 result = QueryResult(
                     query_id="custom_sql_query",
@@ -99,6 +101,8 @@ class ValidationExecutionAgent:
                     semantic_objects_used=semantic_objects,
                     source_tables=source_tables,
                     status="SUCCESS",
+                    is_mock=True,
+                    data_source="stub" if is_stub else "local_sqlite",
                 )
             else:
                 try:
@@ -119,6 +123,8 @@ class ValidationExecutionAgent:
                         freshness_status=freshness_status,
                         quality_status=quality_status,
                         status="SUCCESS",
+                        is_mock=False,
+                        data_source="bigquery",
                     )
                 except Exception as exc:
                     raise WarehouseExecutionError(f"BigQuery execution failed: {exc}") from exc

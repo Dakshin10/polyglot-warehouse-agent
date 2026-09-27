@@ -20,8 +20,8 @@ _SRC_DIR = pathlib.Path(__file__).parent.parent.parent
 if str(_SRC_DIR) not in sys.path:
     sys.path.insert(0, str(_SRC_DIR))
 
-from pwa.agent.pipeline.orchestrator import PipelineResult, run_query_verbose
-from pwa.eval.benchmark import evaluate_query_conditions, evaluate_expected_check
+from pwa.agent.pipeline.orchestrator import PipelineResult, run_query_verbose  # noqa: E402
+from pwa.eval.benchmark import evaluate_expected_check, evaluate_query_conditions  # noqa: E402
 
 logger = logging.getLogger("pwa.eval.run_100")
 _QUERIES_FILE = pathlib.Path(__file__).parent / "benchmark_100_queries.json"
@@ -33,7 +33,7 @@ def run_100_benchmark() -> Dict[str, Any]:
     total_queries = len(queries)
 
     print("\n" + "=" * 80)
-    print(f"  PWA 100-QUERY COMPREHENSIVE PIPELINE & STREAMLIT BENCHMARK")
+    print("  PWA 100-QUERY COMPREHENSIVE PIPELINE & STREAMLIT BENCHMARK")
     print(f"  Total Queries: {total_queries} | Timestamp: {datetime.datetime.now().isoformat()}")
     print("=" * 80 + "\n")
 
@@ -65,7 +65,7 @@ def run_100_benchmark() -> Dict[str, Any]:
         is_pass, failed_at_stage, error_msg = evaluate_query_conditions(entry, res)
         expected_match = evaluate_expected_check(entry, res)
 
-        if is_pass:
+        if is_pass and expected_match:
             passed_count += 1
             cat_summary[category]["passed"] += 1
             status_str = "PASS"
@@ -88,7 +88,8 @@ def run_100_benchmark() -> Dict[str, Any]:
                 "id": qid,
                 "category": category,
                 "question": question,
-                "pass": is_pass,
+                "pass": is_pass and expected_match,
+                "expected_match": expected_match,
                 "failed_at_stage": failed_at_stage,
                 "error_message": error_msg,
                 "generated_sql": sql_str,

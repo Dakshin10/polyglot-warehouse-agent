@@ -109,7 +109,7 @@ class TestPhase2ASemantic(unittest.TestCase):
         plan = self.planner.plan_query(intent)
         sql = self.generator.compile_sql(plan)
 
-        self.assertTrue(sql.startswith("SELECT"))
+        self.assertTrue(sql.startswith("SELECT") or sql.startswith("WITH"))
         self.assertIn("curated_enterprise.fact_sales_order", sql)
         self.assertIn("GROUP BY", sql)
         self.assertIn("LIMIT 5;", sql)

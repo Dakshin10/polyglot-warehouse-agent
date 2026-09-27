@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Any
 
 from pwa.semantic.query_planner import QueryPlan
 
@@ -56,6 +57,9 @@ class GovernedSqlGenerator:
 
     def compile_sql(self, plan: QueryPlan) -> str:
         """Compile a QueryPlan into a governed, read-only BigQuery SQL query string."""
+        if plan.fanout_risk:
+            return self._compile_preaggregated_sql(plan)
+
         select_clause_items: list[str] = []
 
         # 1. Dimension Columns
@@ -122,4 +126,116 @@ class GovernedSqlGenerator:
         # Validate SQL safety
         self.validator.validate_sql(sql)
         logger.info(f"[GovernedSqlGenerator] Compiled SQL for entity `{plan.primary_entity.name}`")
+        return sql
+
+    def _compile_preaggregated_sql(self, plan: QueryPlan) -> str:
+        """Compile a QueryPlan with CTE subquery pre-aggregation to prevent fan-out row multiplication."""
+        cte_blocks: list[str] = []
+        entity_map = {e.name: e for e in plan.target_entities}
+
+        # Group measures by entity
+        measures_by_entity: dict[str, list[tuple[str, Any]]] = {}
+        for alias, m in plan.selected_measures:
+            measures_by_entity.setdefault(alias, []).append((alias, m))
+
+        # Build CTE blocks for each fact entity that has measures
+        join_keys_by_entity: dict[str, str] = {}
+        for rel in plan.joined_relationships:
+            join_keys_by_entity[rel.source_entity] = rel.source_key
+            join_keys_by_entity[rel.target_entity] = rel.target_key
+
+        for entity_name, m_list in measures_by_entity.items():
+            ent = entity_map.get(entity_name)
+            if not ent:
+                continue
+            join_key = join_keys_by_entity.get(entity_name, ent.primary_key[0] if ent.primary_key else "id")
+
+            m_selects = [f"{m.aggregation}({m.column}) AS {m.name}" for _, m in m_list]
+            cte_sql = (
+                f"{entity_name}_agg AS (\n"
+                f"  SELECT\n"
+                f"    {join_key},\n"
+                f"    " + ",\n    ".join(m_selects) + "\n"
+                f"  FROM `{ent.physical_table}`\n"
+                f"  GROUP BY {join_key}\n"
+                f")"
+            )
+            cte_blocks.append(cte_sql)
+
+        with_clause = "WITH " + ",\n".join(cte_blocks)
+
+        main_select_items: list[str] = []
+        for alias, attr in plan.selected_dimensions:
+            main_select_items.append(f"{alias}.{attr.column} AS {attr.name}")
+
+        for alias, m in plan.selected_measures:
+            cte_alias = f"{alias}_agg"
+            agg_func = "SUM" if m.aggregation.upper() in ("SUM", "COUNT") else m.aggregation.upper()
+            main_select_items.append(f"{agg_func}({cte_alias}.{m.name}) AS {m.name}")
+
+        for metric in plan.selected_metrics:
+            main_select_items.append(f"{metric.formula} AS {metric.name}")
+
+        if not main_select_items:
+            main_select_items.append("*")
+
+        main_select_str = ",\n  ".join(main_select_items)
+
+        # Build FROM & JOIN clauses for main query
+        primary_name = plan.primary_entity.name
+        if primary_name in measures_by_entity:
+            from_str = f"{primary_name}_agg"
+        else:
+            from_str = f"`{plan.primary_entity.physical_table}` AS {primary_name}"
+
+        joined_tables = {primary_name}
+        join_items: list[str] = []
+
+        for rel in plan.joined_relationships:
+            if rel.target_entity not in joined_tables and rel.source_entity in joined_tables:
+                new_table = rel.target_entity
+                source_table = rel.source_entity
+                source_key = rel.source_key
+                target_key = rel.target_key
+            elif rel.source_entity not in joined_tables and rel.target_entity in joined_tables:
+                new_table = rel.source_entity
+                source_table = rel.target_entity
+                source_key = rel.target_key
+                target_key = rel.source_key
+            else:
+                continue
+
+            joined_tables.add(new_table)
+
+            source_ref = f"{source_table}_agg" if source_table in measures_by_entity else source_table
+            if new_table in measures_by_entity:
+                target_ref = f"{new_table}_agg"
+                join_items.append(
+                    f"{rel.join_type} JOIN {target_ref} ON {source_ref}.{source_key} = {target_ref}.{target_key}"
+                )
+            else:
+                ent_obj = entity_map.get(new_table)
+                phys_table = ent_obj.physical_table if ent_obj else new_table
+                target_ref = f"`{phys_table}` AS {new_table}"
+                join_items.append(
+                    f"{rel.join_type} JOIN {target_ref} ON {source_ref}.{source_key} = {new_table}.{target_key}"
+                )
+
+        joins_str = "\n".join(join_items)
+        limit_str = f"LIMIT {plan.limit}"
+
+        sql_parts = [
+            with_clause,
+            f"SELECT\n  {main_select_str}",
+            f"FROM {from_str}",
+        ]
+        if joins_str:
+            sql_parts.append(joins_str)
+        if plan.group_by_expressions:
+            sql_parts.append(f"GROUP BY {', '.join(plan.group_by_expressions)}")
+        sql_parts.append(limit_str)
+
+        sql = "\n".join(sql_parts) + ";"
+        self.validator.validate_sql(sql)
+        logger.info("[GovernedSqlGenerator] Compiled pre-aggregated CTE SQL to prevent fan-out.")
         return sql

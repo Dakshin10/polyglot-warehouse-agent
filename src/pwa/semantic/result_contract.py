@@ -37,6 +37,8 @@ class QueryResult:
     quality_status: str = "PASS"
     visualization_hint: str = "table"  # table | bar | line | scatter | metric_card
     status: str = "SUCCESS"  # SUCCESS | WARNING | ERROR
+    is_mock: bool = False
+    data_source: str = "bigquery"  # bigquery | local_sqlite | stub
 
 
 class SemanticQueryEngine:
@@ -109,6 +111,9 @@ class SemanticQueryEngine:
             + [m.name for m in plan.selected_metrics]
         )
 
+        is_mock_mode = bool(self.writer.mock)
+        data_source_mode = "bigquery"
+
         try:
             if self.writer.mock:
                 from pwa.warehouse.local_engine import get_local_sqlite_engine
@@ -118,6 +123,7 @@ class SemanticQueryEngine:
                     rows = df.to_dict(orient="records")
                     row_cnt = len(rows)
                     cols = list(df.columns)
+                    data_source_mode = "local_sqlite"
                 except Exception as local_exc:
                     logger.warning(f"Local SQLite engine execution failed, falling back to schema stubs: {local_exc}")
                     cols = (
@@ -130,12 +136,14 @@ class SemanticQueryEngine:
                     mock_df = pd.DataFrame([{col: "sample_val" if "name" in col or "cat" in col else 100 for col in cols}])
                     rows = mock_df.to_dict(orient="records")
                     row_cnt = len(rows)
+                    data_source_mode = "stub"
             else:
                 assert self.writer._client is not None, "BigQueryWriter is not mocked but has no live client"
                 df = self.writer._client.query(sql).to_dataframe()
                 rows = df.to_dict(orient="records")
                 row_cnt = len(rows)
                 cols = list(df.columns)
+                data_source_mode = "bigquery"
         except Exception as exc:
             logger.error(f"Execution failed for query `{query_id}`: {exc}")
             return QueryResult(
@@ -150,6 +158,8 @@ class SemanticQueryEngine:
                 source_tables=source_tables,
                 warnings=[str(exc)],
                 status="ERROR",
+                is_mock=is_mock_mode,
+                data_source=data_source_mode if is_mock_mode else "bigquery",
             )
 
         elapsed = round(time.time() - start_time, 4)
@@ -170,6 +180,8 @@ class SemanticQueryEngine:
             quality_status=quality_status,
             visualization_hint=viz_hint,
             status="SUCCESS",
+            is_mock=is_mock_mode,
+            data_source=data_source_mode,
         )
 
     def _lookup_last_ingested_at(self, source_id: str) -> Optional[str]:

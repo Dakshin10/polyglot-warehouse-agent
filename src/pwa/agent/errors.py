@@ -31,6 +31,14 @@ class SemanticNotFoundError(PwaAgentError):
         super().__init__(message, code="SEMANTIC_NOT_FOUND")
 
 
+class SemanticGrainValidationError(PwaAgentError):
+    """Raised when a query attempts an unsafe cross-grain join causing row multiplication (fan-out)."""
+
+    def __init__(self, message: str, fanout_details: list[dict[str, str]] | None = None) -> None:
+        super().__init__(message, code="SEMANTIC_GRAIN_VALIDATION_FAILED")
+        self.fanout_details = fanout_details or []
+
+
 class InvalidRelationshipError(PwaAgentError):
     """Raised when an un-governed relationship/join path is attempted."""
 

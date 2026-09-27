@@ -57,6 +57,8 @@ class PipelineResult:
     data_provenance: list[dict[str, Any]] = field(default_factory=list)
     ambiguity_options: list[str] = field(default_factory=list)
     clarification_message: str = ""
+    is_mock: bool = False
+    data_source: str = "bigquery"
 
 
 class MultiAgentPipelineOrchestrator:
@@ -232,6 +234,8 @@ class MultiAgentPipelineOrchestrator:
                 viz_recommendation=analytical_ans.visualization_spec.__dict__
                 if analytical_ans.visualization_spec
                 else None,
+                is_mock=analytical_ans.is_mock,
+                data_source=analytical_ans.data_source,
             )
 
         # Stage 1: Agent 1 Semantic Grounding
@@ -333,6 +337,8 @@ class MultiAgentPipelineOrchestrator:
             viz_recommendation=analytical_ans.visualization_spec.__dict__
             if analytical_ans.visualization_spec
             else None,
+            is_mock=analytical_ans.is_mock,
+            data_source=analytical_ans.data_source,
         )
 
 

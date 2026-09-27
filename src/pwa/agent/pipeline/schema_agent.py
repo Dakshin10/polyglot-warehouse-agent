@@ -6,6 +6,9 @@ the Phase 2A Enterprise Semantic Catalog.
 
 from __future__ import annotations
 
+from collections import defaultdict
+import hashlib
+import math
 import re
 from dataclasses import dataclass, field
 import logging
@@ -27,7 +30,7 @@ _DOMAIN_HEURISTICS: list[tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]
     (("marketplace seller", "marketplace sellers", "seller", "sellers"), ("dim_marketplace_seller",), (), ()),
     (("marketplace payment", "marketplace payments", "payment", "payments"), ("fact_marketplace_payment",), (), ()),
     (("marketplace review", "marketplace reviews", "review", "reviews"), ("fact_marketplace_review",), (), ()),
-    (("closed deal", "closed deals", "deal", "deals"), ("fact_closed_deal",), (), ()),
+    (("closed deal", "closed deals", "deal", "deals", "sales opportunities", "opportunities won", "deals won", "won deals"), ("fact_closed_deal",), (), ()),
     (("marketing lead", "marketing leads", "mql", "lead", "leads"), ("fact_marketing_lead",), (), ()),
     (("revenue", "sales", "sales order total", "order total", "sales total", "freight"), ("fact_sales_order",), (), ("revenue",)),
     (("quantity", "quantity of products", "units", "units sold"), ("fact_sales_order_item",), (), ("quantity_sold",)),
@@ -54,6 +57,85 @@ class GroundedIntent:
     ambiguities: list[str] = field(default_factory=list)
     clarification_required: bool = False
     clarification_message: str = ""
+    confidence_score: float = 1.0
+
+
+_CATALOG_SEMANTIC_DESCRIPTIONS: dict[str, str] = {
+    "fact_closed_deal": "closed deals marketing deals sales opportunities won deals won transactions closed sales declared monthly revenue opportunities won",
+    "fact_marketing_lead": "marketing leads mql incoming inquiries prospective customers prospective clients sales leads inquiry leads",
+    "fact_marketplace_order": "marketplace orders customer orders e-commerce purchases items delivered shipping freight delivered orders",
+    "dim_marketplace_customer": "marketplace customer buyers customer state city customer location buyer state",
+    "dim_marketplace_seller": "marketplace seller sellers merchant vendor store location seller state city seller performance",
+    "fact_marketplace_payment": "marketplace payment payment type installments payment value payment methods payment amount",
+    "fact_marketplace_review": "marketplace review review score rating customer feedback review comment review score",
+    "fact_sales_order": "sales order enterprise sales order total revenue subtotal freight tax amount order year enterprise orders",
+    "fact_sales_order_item": "sales order item line item quantity sold product quantity units sold order line items sold",
+    "fact_purchase_order": "purchase order procurement expenditure supplier purchase vendor buying order purchase amount items bought from suppliers vendor procurement",
+    "fact_inventory": "inventory stock levels warehouse availability items on hand inventory quantity stock count warehouse stock stock level availability",
+    "dim_customer": "customer master record enterprise buyer client customer name customer list",
+    "dim_product": "product catalog product category subcategory list price standard cost color product number item catalog",
+    "dim_supplier": "supplier vendor credit rating active supplier vendor name vendor list",
+    "dim_employee": "employee headcount staff job title department human resources hire date gender staff headcount",
+}
+
+# ---------------------------------------------------------------------------
+# Entity description embedding cache
+# ---------------------------------------------------------------------------
+# Entity descriptions in _CATALOG_SEMANTIC_DESCRIPTIONS are STATIC between
+# catalog edits. Re-calling get_dense_embedding(desc) on every query that
+# reaches the dense path is wasteful — it multiplies the embedding API cost
+# by the number of catalog entities (~15) for every hard query.
+#
+# Cache keys are "entity_name:sha256(desc)[:16]" so that any edit to a
+# description automatically invalidates that entry without stale data risk.
+# The cache is module-level (process lifetime) — entity descriptions do not
+# change at runtime.
+_ENTITY_DESC_EMBEDDING_CACHE: dict[str, list[float]] = {}
+
+
+def _get_cached_entity_embedding(entity_name: str, desc: str) -> list[float] | None:
+    """Return the embedding for an entity description, computing it once and caching.
+
+    The cache key includes a SHA-256 prefix of the description text so that
+    any catalog edit automatically invalidates the cached entry.
+    """
+    from pwa.agent.models import get_dense_embedding
+
+    desc_hash = hashlib.sha256(desc.encode()).hexdigest()[:16]
+    cache_key = f"{id(get_dense_embedding)}:{entity_name}:{desc_hash}"
+
+    if cache_key in _ENTITY_DESC_EMBEDDING_CACHE:
+        return _ENTITY_DESC_EMBEDDING_CACHE[cache_key]
+
+    vec = get_dense_embedding(desc)
+    if vec is not None:
+        _ENTITY_DESC_EMBEDDING_CACHE[cache_key] = vec
+    return vec
+
+
+def _vectorize_text(text: str) -> dict[str, float]:
+    """Build word + 3-gram character frequency vector for semantic matching."""
+    s = text.lower().strip()
+    words = re.findall(r"\b\w+\b", s)
+    c: dict[str, float] = defaultdict(float)
+    for w in words:
+        c[w] += 1.0
+    for i in range(len(words) - 1):
+        c[f"{words[i]}_{words[i+1]}"] += 1.5
+    for i in range(len(s) - 2):
+        c[s[i : i + 3]] += 0.3
+    return c
+
+
+def _cosine_similarity(v1: dict[str, float], v2: dict[str, float]) -> float:
+    if not v1 or not v2:
+        return 0.0
+    dot = sum(v1[k] * v2[k] for k in v1 if k in v2)
+    norm1 = math.sqrt(sum(val * val for val in v1.values()))
+    norm2 = math.sqrt(sum(val * val for val in v2.values()))
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return dot / (norm1 * norm2)
 
 
 class GroundingAgent:
@@ -72,12 +154,13 @@ class GroundingAgent:
         if ambiguity_res.is_ambiguous:
             return GroundedIntent(
                 question=question,
-                analytical_intent=AnalyticalIntent(),
+                analytical_intent=AnalyticalIntent(confidence_score=0.2),
                 confidence="LOW",
                 reasoning=f"Question contains ambiguous term `{ambiguity_res.term}`.",
                 ambiguities=ambiguity_res.possible_interpretations,
                 clarification_required=True,
                 clarification_message=ambiguity_res.clarification_message or "",
+                confidence_score=0.2,
             )
 
         matched_entities, matched_dimensions, matched_measures, matched_metrics = self._match_catalog_terms(q_lower)
@@ -87,6 +170,57 @@ class GroundingAgent:
         if not matched_entities and q_lower in ("yes", "yep", "sure", "ok", "option 1", "revenue", "1"):
             matched_entities = ["fact_sales_order"]
             matched_measures = ["revenue"]
+
+        confidence_score = 0.95 if matched_entities else 0.0
+
+        # If heuristic match missed, perform embedding vector similarity matching (dense API embedding if available, lexical TF-IDF fallback)
+        if not matched_entities:
+            from pwa.agent.models import get_dense_embedding
+
+            dense_q = get_dense_embedding(q_lower)
+            candidate_scores: list[tuple[str, float]] = []
+
+            if dense_q is not None:
+                # Dense embedding similarity path.
+                # Entity description embeddings are computed once and cached;
+                # only the question itself pays an API call per query.
+                for e_name, desc in _CATALOG_SEMANTIC_DESCRIPTIONS.items():
+                    dense_desc = _get_cached_entity_embedding(e_name, desc)
+                    if dense_desc is not None:
+                        dot = sum(a * b for a, b in zip(dense_q, dense_desc))
+                        norm_q = math.sqrt(sum(a * a for a in dense_q))
+                        norm_d = math.sqrt(sum(b * b for b in dense_desc))
+                        sim = (dot / (norm_q * norm_d)) if (norm_q > 0 and norm_d > 0) else 0.0
+                        if sim > 0.30:
+                            candidate_scores.append((e_name, sim))
+
+            if not candidate_scores:
+                # Lexical TF-IDF / n-gram vector similarity fallback
+                q_vec = _vectorize_text(q_lower)
+                for e_name, desc in _CATALOG_SEMANTIC_DESCRIPTIONS.items():
+                    sim = _cosine_similarity(q_vec, _vectorize_text(desc))
+                    if sim > 0.15:
+                        candidate_scores.append((e_name, sim))
+
+            candidate_scores.sort(key=lambda x: x[1], reverse=True)
+
+            cand_ambiguity = self.ambiguity_model.evaluate_candidates(candidate_scores)
+            if cand_ambiguity.is_ambiguous:
+                return GroundedIntent(
+                    question=question,
+                    analytical_intent=AnalyticalIntent(confidence_score=candidate_scores[0][1] if candidate_scores else 0.0),
+                    confidence="LOW",
+                    reasoning=f"Ambiguity/low-confidence in similarity matching: {cand_ambiguity.clarification_message}",
+                    ambiguities=cand_ambiguity.possible_interpretations,
+                    clarification_required=True,
+                    clarification_message=cand_ambiguity.clarification_message or "",
+                    confidence_score=candidate_scores[0][1] if candidate_scores else 0.0,
+                )
+
+            if candidate_scores:
+                top_entity, top_score = candidate_scores[0]
+                matched_entities = [top_entity]
+                confidence_score = round(top_score, 4)
 
         # Default measure/dimension fallbacks for bare entity queries
         if matched_entities and not matched_dimensions and not matched_measures and not matched_metrics:
@@ -104,6 +238,9 @@ class GroundingAgent:
                     if "purchase" in p_entity:
                         if "purchase_amount" not in matched_measures:
                             matched_measures.append("purchase_amount")
+                    elif "inventory" in p_entity:
+                        if "inventory_quantity" not in matched_measures:
+                            matched_measures.append("inventory_quantity")
                     elif "sales" in p_entity or "order" in p_entity or "item" in p_entity:
                         if "revenue" not in matched_measures:
                             matched_measures.append("revenue")
@@ -113,7 +250,7 @@ class GroundingAgent:
             # Ask the user to clarify rather than answering a different question.
             return GroundedIntent(
                 question=question,
-                analytical_intent=AnalyticalIntent(),
+                analytical_intent=AnalyticalIntent(confidence_score=0.0),
                 confidence="LOW",
                 reasoning="No known entities, dimensions, or measures were recognized in the question.",
                 ambiguities=[],
@@ -123,6 +260,7 @@ class GroundingAgent:
                     "(sales, products, customers, suppliers, employees, inventory, leads). "
                     "Could you rephrase it in terms of one of these areas?"
                 ),
+                confidence_score=0.0,
             )
 
         limit = self._parse_limit(q_lower)
@@ -136,15 +274,19 @@ class GroundingAgent:
             time_dimension=time_dim,
             granularity=granularity,
             limit=limit if limit is not None else 100,
+            confidence_score=confidence_score,
         )
 
-        confidence = "HIGH" if (matched_entities and (matched_measures or matched_metrics)) else "MEDIUM"
+        confidence = "HIGH" if (confidence_score >= 0.75 and matched_entities and (matched_measures or matched_metrics)) else "MEDIUM"
+        if confidence_score < 0.5:
+            confidence = "LOW"
 
         return GroundedIntent(
             question=question,
             analytical_intent=intent,
             confidence=confidence,
             reasoning=f"Grounded intent to entities={matched_entities}, dimensions={matched_dimensions}, measures={matched_measures}, metrics={matched_metrics}.",
+            confidence_score=confidence_score,
         )
 
     def _match_catalog_terms(self, q_lower: str) -> tuple[list[str], list[str], list[str], list[str]]:
@@ -201,7 +343,14 @@ class GroundingAgent:
                     matched_measures.append(m)
 
         # Special-cased: the measure depends on whether "count" also appears.
-        if "purchase" in q_lower or "procurement" in q_lower:
+        if any(kw in q_lower for kw in ("purchase", "procurement", "paid", "spent", "money")) and any(kw in q_lower for kw in ("vendor", "supplier", "vendors", "suppliers")):
+            if "fact_purchase_order" not in matched_entities:
+                matched_entities.append("fact_purchase_order")
+            if "dim_supplier" in matched_entities:
+                matched_entities.remove("dim_supplier")
+            if "purchase_amount" not in matched_measures and "purchase_order_count" not in matched_measures:
+                matched_measures.append("purchase_amount")
+        elif "purchase" in q_lower or "procurement" in q_lower:
             if "fact_purchase_order" not in matched_entities:
                 matched_entities.append("fact_purchase_order")
             if "purchase_amount" not in matched_measures and "purchase_order_count" not in matched_measures:

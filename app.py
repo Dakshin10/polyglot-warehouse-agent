@@ -113,6 +113,8 @@ def _stub_run_query_verbose(question: str, stage_callback=None) -> PipelineResul
                 "last_refreshed": "Live transactional data",
             }
         ],
+        is_mock=True,
+        data_source="stub",
     )
 
 
@@ -177,6 +179,11 @@ def _render_assistant_result(
     if isinstance(result, str):
         render_rejection_panel(result)
         return
+
+    is_mock = getattr(result, "is_mock", False) or (isinstance(result, dict) and result.get("is_mock", False))
+    data_source = getattr(result, "data_source", "bigquery") or (result.get("data_source") if isinstance(result, dict) else "bigquery")
+    if is_mock or data_source in ("stub", "local_sqlite"):
+        st.warning(f"⚠️ No live data source configured — showing placeholder values (data_source: `{data_source}`)")
 
     answer_text = getattr(result, "answer", None) or (result.get("answer") if isinstance(result, dict) else "")
     stage_latencies = getattr(result, "stage_latencies", None) or (

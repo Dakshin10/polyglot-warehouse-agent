@@ -15,6 +15,7 @@ pwa source run            download -> transform -> load -> gates 1-13
 pwa source verify         gates 1-13 only
 pwa warehouse run         setup -> land -> mart -> gates B1-B15
 pwa warehouse verify      gates B1-B15 only
+pwa catalog draft <table> auto-generate draft SemanticCatalog entry from discovered schema (or --all)
 pwa all                   source run then warehouse run
 pwa query "<question>"    NLP query against BigQuery mart views
 pwa query --interactive   interactive REPL question-answering loop
@@ -833,6 +834,86 @@ def cmd_analyze_explain(question: str) -> int:
     return 0
 
 
+def cmd_catalog_draft(table_name: str = "", draft_all: bool = False, output_dir: str = "catalog_drafts") -> int:
+    """Generate catalog entry draft(s) from discovered schema and write to catalog_drafts/."""
+    from pathlib import Path
+    from pwa.semantic.draft_generator import generate_catalog_draft, save_catalog_draft
+    from pwa.source_registry import get_registry
+    from pwa.ingestion.connectors.base import get_connector_for_source, TableSchema, SchemaColumn
+    from pwa.settings import REPO_ROOT
+
+    out_path = Path(output_dir) if Path(output_dir).is_absolute() else REPO_ROOT / output_dir
+
+    registry = get_registry()
+    schemas_to_process: list[TableSchema] = []
+
+    if draft_all or table_name.lower() in ("all", "--all"):
+        print("\n=== Generating Catalog Drafts for ALL Registered Sources ===")
+        for src in registry.sources:
+            try:
+                connector = get_connector_for_source(src)
+                for t in src.tables:
+                    try:
+                        schema = connector.discover_schema(t.name)
+                        schemas_to_process.append(schema)
+                    except Exception as exc:
+                        logger.warning(f"Could not discover schema for {t.name}: {exc}")
+            except Exception as exc:
+                logger.warning(f"Could not connect/inspect source {src.name}: {exc}")
+    else:
+        if not table_name:
+            print(
+                "Error: table_name required or use --all (e.g. pwa catalog draft fact_sales or pwa catalog draft --all)",
+                file=sys.stderr,
+            )
+            return 1
+
+        found = False
+        for src in registry.sources:
+            for t in src.tables:
+                if t.name.lower() == table_name.lower():
+                    try:
+                        connector = get_connector_for_source(src)
+                        schema = connector.discover_schema(t.name)
+                        schemas_to_process.append(schema)
+                        found = True
+                        break
+                    except Exception as exc:
+                        logger.warning(f"Error discovering schema for {table_name}: {exc}")
+            if found:
+                break
+
+        if not found:
+            print(f"Warning: Table '{table_name}' not found directly in registered sources registry. Generating generic draft.")
+            schemas_to_process.append(
+                TableSchema(
+                    table_name=table_name,
+                    columns=[
+                        SchemaColumn(name=f"{table_name}_id", data_type="INTEGER", is_pk=True),
+                        SchemaColumn(name="name", data_type="VARCHAR"),
+                        SchemaColumn(name="amount", data_type="NUMERIC"),
+                        SchemaColumn(name="created_at", data_type="TIMESTAMP"),
+                    ],
+                    primary_key=[f"{table_name}_id"],
+                )
+            )
+
+    if not schemas_to_process:
+        print("No schemas could be discovered for processing.", file=sys.stderr)
+        return 1
+
+    saved_files = []
+    for schema in schemas_to_process:
+        draft = generate_catalog_draft(schema)
+        p = save_catalog_draft(draft, output_dir=out_path)
+        saved_files.append(p)
+        print(f"  ✓ Saved catalog draft for table '{schema.table_name}' -> {p}")
+
+    print(f"\n[Catalog Draft Generation Complete] Generated {len(saved_files)} draft file(s) in {out_path}.")
+    print("NOTE: These are structural drafts for human review. Live catalog configuration was NOT modified.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pwa",
@@ -936,6 +1017,12 @@ def build_parser() -> argparse.ArgumentParser:
     auth.add_argument("action", choices=["add-user"], help="Sub-action")
     auth.add_argument("username", help="Username to add/update")
 
+    cat_draft = sub.add_parser("catalog", help="Auto-generate draft semantic catalog entries from discovered schemas")
+    cat_draft.add_argument("action", choices=["draft"], nargs="?", default="draft", help="Sub-action (draft)")
+    cat_draft.add_argument("table_name", nargs="?", default="", help="Table name to generate draft for")
+    cat_draft.add_argument("--all", action="store_true", help="Generate drafts for all discovered tables across sources")
+    cat_draft.add_argument("--output-dir", default="catalog_drafts", help="Output directory for draft YAML files")
+
     return parser
 
 
@@ -1026,6 +1113,9 @@ def main() -> None:  # noqa: C901 — argparse subcommand dispatch; a rewrite in
     if args.command == "auth":
         if args.action == "add-user":
             sys.exit(cmd_auth_add_user(args.username))
+    if args.command == "catalog":
+        if args.action == "draft":
+            sys.exit(cmd_catalog_draft(args.table_name, draft_all=args.all, output_dir=args.output_dir))
 
     parser.print_help()
     sys.exit(1)

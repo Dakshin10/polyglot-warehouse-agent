@@ -38,6 +38,8 @@ class AnalyticalAnswer:
     observation_summary: str = ""
     interpretation_summary: str = ""
     causal_claims_asserted: list[str] = field(default_factory=list)
+    is_mock: bool = False
+    data_source: str = "bigquery"
 
 
 def _summarize_numeric_columns(rows: list[dict[str, Any]], columns: list[str]) -> str:
@@ -114,6 +116,11 @@ class AnswerSynthesisAgent:
             warnings.append(f"Data freshness SLA status is `{query_result.freshness_status}`.")
         if query_result.quality_status != "PASS":
             warnings.append(f"Data quality status is `{query_result.quality_status}`.")
+        if query_result.is_mock:
+            warnings.append(
+                f"⚠️ MOCK DATA SOURCE NOTICE: Query executed in offline mock mode using placeholder values (data_source='{query_result.data_source}')."
+            )
+            answer_text += f" [Offline Mock Mode: results from placeholder/local source '{query_result.data_source}']"
 
         # 4. Numerical Grounding Anti-Hallucination Audit
         self._verify_numerical_grounding(answer_text, query_result.rows)
@@ -138,6 +145,8 @@ class AnswerSynthesisAgent:
                 f"{', '.join(query_result.semantic_objects_used) or 'the queried source'}."
             ),
             causal_claims_asserted=[],  # Zero unsupported causal claims asserted
+            is_mock=query_result.is_mock,
+            data_source=query_result.data_source,
         )
 
     def _verify_numerical_grounding(self, text: str, rows: list[dict[str, Any]]) -> None:

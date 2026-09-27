@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 logger = logging.getLogger("pwa.metrics")
 
@@ -39,6 +39,9 @@ class MetricsTracker:
     """Central singleton telemetry collector emitting structured metrics logs."""
 
     _instance: MetricsTracker | None = None
+    telemetry_history: list[QueryTelemetry]
+    cache_hits: int
+    cache_misses: int
 
     def __new__(cls) -> MetricsTracker:
         if cls._instance is None:

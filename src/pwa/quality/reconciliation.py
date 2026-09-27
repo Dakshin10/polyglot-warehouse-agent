@@ -100,7 +100,7 @@ class SourceTargetReconciler:
         """
         from pwa.source_registry import get_registry
         from pwa.ingestion.connectors.base import get_connector_for_source
-        from pwa.smart_cache import evaluate_and_invalidate_cache, compute_table_signal, SyncStateStore
+        from pwa.smart_cache import compute_table_signal, evaluate_and_invalidate_cache
         import pandas as pd
 
         registry = get_registry()

@@ -1,272 +1,334 @@
-# Nexora Enterprise Platform — Polyglot Warehouse Agent (`pwa`)
+# ⚡ Polyglot Warehouse Agent (`pwa`) — Nexora Enterprise Platform
 
-> **Production Enterprise Data Integration, Heterogeneous Operational Source Environment, & BigQuery Data Foundation Platform**
+> **State-of-the-Art Multi-Agent AI Data Engineering & Heterogeneous Lakehouse Analytics Platform**
 
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![Google BigQuery](https://img.shields.io/badge/Warehouse-Google_BigQuery-669DF6.svg)](https://cloud.google.com/bigquery)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-**Polyglot Warehouse Agent (`pwa`)** is a production-style enterprise data integration and warehouse foundation platform built for **Nexora Technologies** (an enterprise test environment). 
-
-PWA integrates three heterogeneous operational source databases—**Cloudflare D1 (SQLite)**, **Google Cloud AlloyDB (PostgreSQL)**, and **Aiven MySQL (MySQL)**—plus multi-domain Kaggle source datasets into a centralized **Google BigQuery** enterprise warehouse platform across RAW, STAGING, and CURATED data layers.
-
----
-
-## 📌 Project Milestones Status
-
-| Milestone | Description | Status |
-|---|---|---|
-| **Phase 1A** | Source & Operational Data Foundation (Nexora Domain Migration, Kaggle Dataset Decoupling, Schema Registries) | **[IMPLEMENTED]** |
-| **Phase 1B** | Enterprise Ingestion & BigQuery Data Foundation (Connectors, Extraction Engine, Control Plane, 13 Quality Gates, Watermarks, Schema Drift) | **[IMPLEMENTED]** |
-| **Phase 1C** | Production Hardening & Enterprise Operations (Incremental Ingestion, Cloud Connectivity, SLA Freshness, Dead Letter Queue, Security Guardrails) | **[IMPLEMENTED]** |
-| **Phase 2A** | Enterprise Semantic & Analytics Foundation (Catalog, Query Planning, Governed SQL Generator, Safety Validator, Ambiguity Model, Cost Guardrails) | **[IMPLEMENTED]** |
-| **Phase 2B** | Multi-Agent Enterprise Analytics (Query Router, Semantic Grounding, Governed SQL Agent, Validation & Exec Agent, Answer Synthesis, Viz Router) | **[IMPLEMENTED]** |
-| **Phase 2C** | Advanced Enterprise Analytics & Data Science Foundation (Analytical Workflows, Period Comparisons, Contribution, Cohorts, Retention, Funnels, Anomaly Detection, Feature Engineering) | **[IMPLEMENTED]** |
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
+[![Google BigQuery](https://img.shields.io/badge/Warehouse-Google_BigQuery-669DF6.svg?style=for-the-badge&logo=googlecloud&logoColor=white)](https://cloud.google.com/bigquery)
+[![Multi-Agent AI](https://img.shields.io/badge/AI_Engine-Multi--Agent_Pipeline-7B2CBF.svg?style=for-the-badge&logo=openai&logoColor=white)](https://github.com/Dakshin10/polyglot-warehouse-agent)
+[![Data Quality](https://img.shields.io/badge/Quality-13_Enterprise_Gates-00B4D8.svg?style=for-the-badge&logo=shield&logoColor=white)](https://github.com/Dakshin10/polyglot-warehouse-agent)
+[![Tests Passing](https://img.shields.io/badge/Tests-419_Passed_Offline-00F5D4.svg?style=for-the-badge&logo=pytest&logoColor=black)](https://github.com/Dakshin10/polyglot-warehouse-agent)
+[![License: MIT](https://img.shields.io/badge/License-MIT-FFB703.svg?style=for-the-badge)](LICENSE)
 
 ---
 
-## 🏗️ Nexora Enterprise Data Architecture
+## 💡 Executive Summary at a Glance
 
-The system architecture simulates a real-world enterprise operating multiple independent, domain-specific operational databases. Operational databases remain logically independent without cross-database foreign keys. Cross-system identity resolution and integration belong exclusively in the BigQuery warehouse.
+**Polyglot Warehouse Agent (`pwa`)** is an enterprise-grade data integration, warehouse automation, and multi-agent AI analytics system built for **Nexora Technologies**. 
+
+It unifies **3 heterogeneous operational source engines** (Cloudflare D1 SQLite, Cloud AlloyDB PostgreSQL, and Aiven MySQL) and Kaggle enterprise datasets into a **Google BigQuery Data Lakehouse** (Bronze/Silver/Gold/Metadata). On top of this governed data foundation sits a **governed 4-Agent AI analytics engine** capable of translating natural language questions into accurate, fanout-safe SQL, executing offline against local SQLite mirrors or live in BigQuery, and rendering automated visualization recommendations.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 HIGH-LEVEL PLATFORM FLOW                                         │
+│                                                                                                  │
+│  [Heterogeneous Sources]  ➜  [13 Quality Gates]  ➜  [BigQuery Lakehouse]  ➜  [Multi-Agent AI]     │
+│  • Cloudflare D1 (SQLite)    • PK Uniqueness         • RAW / Bronze            • Agent 1: Grounding │
+│  • AlloyDB (PostgreSQL)      • Schema Drift Check    • STAGING / Silver        • Agent 2: SQL Gen   │
+│  • Aiven (MySQL)             • Watermark Bounds      • CURATED / Gold          • Agent 3: Safety    │
+│  • Multi-Domain CSVs         • Freshness SLAs        • Metadata Control        • Agent 4: Synthesis │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 Project Milestones & Capabilities
+
+| Phase | Milestone Name | Description & Capabilities | Status |
+| :--- | :--- | :--- | :---: |
+| **Phase 1A** | **Source Data Foundation** | Nexora domain migration, Kaggle dataset decoupling, multi-database schema registries. | `[COMPLETED]` |
+| **Phase 1B** | **Ingestion & Lakehouse** | Connectors, chunked extraction engine, control plane (`pwa_metadata`), 13 quality gates, SLA watermarks. | `[COMPLETED]` |
+| **Phase 1C** | **Production Hardening** | Incremental watermark ingestion, exponential backoff retries, dead letter queue, PII security guardrails. | `[COMPLETED]` |
+| **Phase 2A** | **Enterprise Semantic Layer** | Catalog loader, query planner, governed SQL generator, safety validator, fanout CTE pre-aggregator. | `[COMPLETED]` |
+| **Phase 2B** | **Multi-Agent AI Pipeline** | 4-agent orchestration (Grounding, Governed SQL, Exec/Safety, Answer Synthesis), viz recommendation. | `[COMPLETED]` |
+| **Phase 2C** | **Advanced Analytics & DS** | YoY/MoM growth comparison, driver contribution, cohort retention, conversion funnels, anomaly detection. | `[COMPLETED]` |
+
+---
+
+## 📐 End-to-End System Architecture
+
+The diagram below details the entire end-to-end flow from source extraction through data lakehouse layering to multi-agent query execution and analytics visualization.
 
 ```mermaid
-graph TD
-    subgraph Operational_Sources["Operational Source Systems"]
-        D1["Cloudflare D1 (SQLite)<br/><i>Application & CRM</i>"]
-        ALLOY["AlloyDB / PostgreSQL<br/><i>Core Enterprise ERP</i>"]
-        AIVEN["Aiven / MySQL<br/><i>Operations & Supply Chain</i>"]
+flowchart TD
+    subgraph SOURCES["1. Heterogeneous Operational Sources"]
+        D1["Cloudflare D1 (SQLite)<br/><i>CRM, Support, Marketing</i>"]
+        ALLOY["Cloud AlloyDB (PostgreSQL)<br/><i>Core ERP & E-Commerce</i>"]
+        AIVEN["Aiven MySQL (MySQL)<br/><i>Supply Chain & Logistics</i>"]
+        FILES["Kaggle Multi-Domain CSVs<br/><i>AdventureWorks & Olist</i>"]
     end
 
-    subgraph PWA_Control_Plane["PWA Control Plane Metadata (pwa_metadata)"]
-        CP["Control Plane Manager<br/><i>pwa_pipeline_runs, pwa_watermarks, pwa_quality_results, pwa_audit_log</i>"]
+    subgraph ENGINE["2. PWA Ingestion & Quality Control Engine"]
+        EXT["Bounded Extraction Engine<br/><i>Chunking, Hash Fingerprinting</i>"]
+        DRIFT["Schema Evolution Auditor<br/><i>Type Coercion & Drift Check</i>"]
+        GATES["13 Enterprise Quality Gates<br/><i>Nulls, Ranges, PK Uniqueness</i>"]
+        CP["Control Plane Metadata Store<br/><i>pwa_metadata (8 telemetry tables)</i>"]
     end
 
-    subgraph PWA_Engine["PWA Enterprise Ingestion Engine"]
-        EXT["Bounded Batch Extraction Engine<br/><i>Chunking, Stream-buffering, Payload Hash</i>"]
-        DRIFT["Schema Evolution Engine<br/><i>Type Coercion & Drift Auditor</i>"]
-        GATE["13 Quality Gates Framework<br/><i>PK Uniqueness, Null Checks, SLA</i>"]
+    subgraph WAREHOUSE["3. Google BigQuery Lakehouse Layers"]
+        RAW["RAW / BRONZE Dataset<br/>(nexora_raw: _pwa_payload_hash)"]
+        STAGING["STAGING / SILVER Dataset<br/>(nexora_staging: snake_case, typed)"]
+        CURATED["CURATED / GOLD Dataset<br/>(nexora_curated: Governed Entities)"]
     end
 
-    subgraph Downstream_Warehouse["Google BigQuery Enterprise Warehouse"]
-        RAW["RAW / BRONZE Layer<br/>(Minimal transform, _pwa_ingested_at, _pwa_payload_hash)"]
-        SILVER["STAGING / SILVER Layer<br/>(Normalized snake_case, typed, deduplicated)"]
-        GOLD["CURATED / GOLD Layer<br/>(Enterprise Domain Entities & Contracts)"]
+    subgraph FASTPATH["4. Fast-Path & Smart Caching Layer"]
+        SCACHE["Smart Cache & SyncStateStore<br/>(SHA-256 Table Signal Hashing)"]
+        TEMPL["Template Router & Rollups<br/>(Pre-Aggregated Fast Path)"]
     end
 
-    subgraph Analytics_Engine["AI Analytics Engine & Fast-Path Routing"]
-        FASTPATH["Rollup Tables & Template Router<br/>(refresh-rollups & template_router fast path)"]
-        MULTIAGENT["Multi-Agent Query Pipeline<br/>(Query Router, Grounding, Governed SQL, Viz Router)"]
+    subgraph AI_AGENTS["5. Governed Multi-Agent AI Pipeline"]
+        USER(["User Natural Language Query"])
+        ROUTER["Router Agent<br/>(Intent Classification & Ambiguity Check)"]
+        AG1["Agent 1: Semantic Grounding<br/>(Dense Embedding & TF-IDF Cosine Similarity)"]
+        AG2["Agent 2: Governed SQL Agent<br/>(Query Planner & CTE Fanout Protection)"]
+        AG3["Agent 3: Safety & Exec Agent<br/>(SqlSafetyValidator & BQ / SQLite Engine)"]
+        AG4["Agent 4: Answer Synthesis<br/>(Markdown Synthesis, Viz Router & Plotly)"]
     end
 
-    subgraph Scheduled_Reconciliation["Daily Reconciliation Schedule (03:00 UTC)"]
-        RECON["Periodic Full PK Reconciliation<br/>(Hard-delete detection & SyncStateStore diff)"]
-    end
+    D1 & ALLOY & AIVEN & FILES --> EXT
+    EXT --> DRIFT --> GATES --> RAW
+    EXT -. Telemetry .- CP
+    GATES -. Results .- CP
 
-    D1 --> EXT
-    ALLOY --> EXT
-    AIVEN --> EXT
+    RAW --> STAGING --> CURATED
+    CURATED --> SCACHE
+    CURATED --> TEMPL
 
-    EXT --> DRIFT
-    DRIFT --> GATE
-    GATE --> RAW
-    RAW --> SILVER
-    SILVER --> GOLD
-    GOLD --> FASTPATH
-    GOLD --> MULTIAGENT
-    GOLD --> RECON
-
-    EXT -. Metadata .- CP
-    GATE -. Quality Logs .- CP
+    USER --> ROUTER
+    ROUTER --> SCACHE
+    SCACHE -- Cache Hit --> AG4
+    SCACHE -- Cache Miss --> TEMPL
+    TEMPL -- Miss / Custom --> AG1
+    AG1 --> AG2 --> AG3 --> AG4
+    AG3 -- Execute SQL --> CURATED
 ```
 
 ---
 
-## 📊 Operational Database Summary Matrix
+## 🗄️ Database Allocation & Domain Matrix
 
-| Database | Engine | Role | Key Domains | Source Datasets |
-|---|---|---|---|---|
-| **Cloudflare D1** | SQLite | Application / Operational | Organization, HR, CRM, Support, Marketing | AdventureWorks HR/Person, Olist Marketing Funnel |
-| **Google Cloud AlloyDB** | PostgreSQL | Core Enterprise ERP | Sales Orders, Products, Customers, Returns, Marketplace | AdventureWorks Sales/Production, Olist E-Commerce |
-| **Aiven MySQL** | MySQL | Operations & Supply Chain | Suppliers, Procurement, Warehousing, Inventory, Logistics | AdventureWorks Purchasing, Olist Sellers |
+To mirror realistic enterprise systems, operational databases are logically decoupled with zero cross-database foreign keys. Identity resolution happens exclusively within BigQuery.
+
+| Source Engine | Technology | Business Domain | Key Tables / Entities | Source Datasets |
+| :--- | :--- | :--- | :--- | :--- |
+| **Cloudflare D1** | SQLite | Application & HR / CRM | Organization, Employees, Departments, Marketing Leads | AdventureWorks HR/Person, Olist Marketing Funnel |
+| **Cloud AlloyDB** | PostgreSQL | Core Enterprise ERP | Sales Orders, Order Items, Customers, Products, Categories | AdventureWorks Sales/Production, Olist E-Commerce |
+| **Aiven MySQL** | MySQL | Operations & Supply Chain | Suppliers, Vendors, Purchase Orders, PO Items, Inventory | AdventureWorks Purchasing, Olist Sellers |
 
 ---
 
-## 🏛️ BigQuery Warehouse Architecture
-
-The BigQuery warehouse is structured into clear architectural layers:
+## 🏛️ BigQuery Warehouse Layering Architecture
 
 ```
-BigQuery Project (salitsteel-502008)
-├── nexora_raw / raw_*          # RAW / BRONZE Layer: Source-native tables with _pwa_* metadata headers
-├── nexora_staging / staging_*  # STAGING / SILVER Layer: Snake_case, standardized data types, deduplicated
-├── nexora_curated / curated_*  # CURATED / GOLD Layer: Enterprise domain models & contracts
-└── pwa_metadata                # Control Plane Operational Metadata (no business data)
+salitsteel-502008 (BigQuery GCP Project)
+├── 📦 nexora_raw / raw_*          ➜ BRONZE: Source-native schema + _pwa_* metadata headers
+├── 📦 nexora_staging / staging_*  ➜ SILVER: Snake_case, standardized datatypes, PK deduplicated
+├── 📦 nexora_curated / curated_*  ➜ GOLD: Enterprise domain models, governed contracts, views
+└── ⚙️ pwa_metadata                ➜ CONTROL PLANE: Operational telemetry & audit logs
 ```
 
-### 1. RAW / BRONZE Layer
-- Preserves raw source records with minimal transformations.
-- Required ingestion metadata appended to every raw table:
-  - `_pwa_ingested_at` (TIMESTAMP)
-  - `_pwa_run_id` (STRING)
-  - `_pwa_source_system` (STRING)
-  - `_pwa_source_table` (STRING)
-  - `_pwa_payload_hash` (SHA-256 string excluding volatile headers)
+```mermaid
+graph LR
+    subgraph Bronze["RAW / BRONZE (nexora_raw)"]
+        R1["raw_salesorderheader"]
+        R2["raw_customer"]
+        R3["raw_product"]
+    end
+    subgraph Silver["STAGING / SILVER (nexora_staging)"]
+        S1["staging_sales_order"]
+        S2["staging_customer"]
+        S3["staging_product"]
+    end
+    subgraph Gold["CURATED / GOLD (nexora_curated)"]
+        G1["fact_sales_order"]
+        G2["dim_customer"]
+        G3["dim_product"]
+    end
+    R1 --> S1 --> G1
+    R2 --> S2 --> G2
+    R3 --> S3 --> G3
+```
 
-### 2. STAGING / SILVER Layer
-- Standardizes source data into reliable, typed warehouse structures.
-- Applies deterministic `snake_case` column naming.
-- Coerces timestamp, date, and numeric types.
-- Deduplicates using stable identity keys (`source_system` + `source_table` + `source_primary_key`).
+### 1. RAW / BRONZE (`nexora_raw`)
+Append-only raw tables preserving exact source payloads alongside standardized lineage headers:
+- `_pwa_ingested_at` (`TIMESTAMP`): UTC ingestion timestamp
+- `_pwa_run_id` (`STRING`): Unique pipeline execution UUID
+- `_pwa_source_system` (`STRING`): Identifier (`d1`, `alloydb`, `aiven`)
+- `_pwa_source_table` (`STRING`): Original source table name
+- `_pwa_payload_hash` (`STRING`): SHA-256 fingerprint of row content excluding volatile metadata
 
-### 3. CURATED / GOLD Layer
-- Trusted enterprise-facing entities (Customers, Products, Sales Orders, Purchase Orders, Suppliers, Inventory, Employees, Leads).
-- Enforces strict contracts. Any entity lacking approved source data is explicitly marked `STRUCTURAL / UNPOPULATED` without fabricating artificial records.
+### 2. STAGING / SILVER (`nexora_staging`)
+Lightly transformed, clean tables:
+- Standardized `snake_case` column naming
+- Type coercion (ISO timestamps, numeric precision, explicit booleans)
+- Deduplication via identity key (`_pwa_source_system` + `_pwa_source_table` + `primary_key`)
 
-### 4. PWA Metadata / Control Plane (`pwa_metadata`)
-Stores operational pipeline telemetry across 8 core tables:
-- `pwa_sources`
-- `pwa_source_tables`
-- `pwa_pipeline_runs`
-- `pwa_task_execution`
-- `pwa_watermarks`
-- `pwa_schema_versions`
-- `pwa_quality_results`
-- `pwa_audit_log`
+### 3. CURATED / GOLD (`nexora_curated`)
+Governed, enterprise analytics domain entities:
+- `fact_sales_order`, `fact_sales_order_item`
+- `fact_purchase_order`, `fact_purchase_order_item`
+- `dim_customer`, `dim_product`, `dim_supplier`, `dim_employee`, `dim_department`
+- `fact_marketplace_order`, `fact_closed_deal`, `fact_marketing_lead`
 
----
-
-## 🛡️ Ingestion Engine & Operational Invariants
-
-The ingestion system strictly enforces 15 mandatory enterprise data invariants:
-
-1. **Watermark Advancement Invariant**: Watermarks advance ONLY IF extraction, transformation, quality checks, warehouse commit, and reconciliation all succeed.
-2. **Payload Hash Determinism**: `_pwa_payload_hash` is generated via SHA-256 on deterministic JSON serialization of payload fields, ignoring volatile ingestion metadata.
-3. **Idempotency**: Re-running ingestion never creates duplicate records.
-4. **Schema Evolution Policy**:
-   - New compatible columns: Allowed & logged.
-   - Wider compatible data types: Allowed & logged.
-   - Incompatible data types / Primary Key changes: Blocked & flagged in control plane.
-5. **Phase 1 Quality Gates Framework (13 Gates)**:
-   - Gate 1: Connectivity
-   - Gate 2: Schema Discovery
-   - Gate 3: Permission Audit
-   - Gate 4: Extraction Boundary
-   - Gate 5: Extraction Completeness
-   - Gate 6: Type Coercion
-   - Gate 7: PK Uniqueness
-   - Gate 8: Null Constraint
-   - Gate 9: Value Range
-   - Gate 10: Standardized Transformation
-   - Gate 11: Warehouse Commit
-   - Gate 12: Source-Target Reconciliation
-   - Gate 13: Freshness SLA
-6. **Retry with Exponential Backoff + Jitter**: Transient network/database errors retry automatically; deterministic validation/schema errors fail fast.
-7. **CDC Architecture Status**: Real-time CDC via GCP Datastream / Debezium was evaluated and explicitly deferred. Batch high-watermark extraction paired with periodic full PK set reconciliation satisfies all current freshness and consistency SLAs. CDC will be revisited only if a sub-minute streaming freshness SLA is introduced.
+### 4. Control Plane Metadata (`pwa_metadata`)
+Operational telemetry recorded across 8 internal tracking tables:
+`pwa_sources`, `pwa_source_tables`, `pwa_pipeline_runs`, `pwa_task_execution`, `pwa_watermarks`, `pwa_schema_versions`, `pwa_quality_results`, `pwa_audit_log`.
 
 ---
 
-## ⚡ Quickstart & PWA CLI Commands
+## 🤖 Governed Multi-Agent AI Analytics Pipeline
 
-### 1. Installation
+When a user asks a natural language question (e.g. *"Show monthly revenue by product category"*), PWA routes the request through a 4-agent orchestration workflow:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User
+    participant Router as Fast-Path / Router
+    participant Ag1 as Agent 1: Grounding
+    participant Ag2 as Agent 2: Governed SQL
+    participant Ag3 as Agent 3: Safety & Exec
+    participant Ag4 as Agent 4: Synthesis & Viz
+
+    User->>Router: "Show monthly revenue by category"
+    Router->>Router: Check Smart Cache & Template Router
+    alt Fast Path Cache Hit
+        Router-->>User: Return Cached Result (<5ms)
+    else Cache Miss / Custom Query
+        Router->>Ag1: Route Question
+        Ag1->>Ag1: Evaluate Ambiguity & Catalog Embedding Match
+        Ag1->>Ag2: Return GroundedIntent
+        Ag2->>Ag2: Plan Query & Check Fan-out Risk (CTE Pre-agg)
+        Ag2->>Ag3: Return Governed QueryPlan
+        Ag3->>Ag3: Validate SqlSafety (Read-only check)
+        Ag3->>Ag3: Execute via BQ Client or Local SQLite Engine
+        Ag3->>Ag4: Return Query Result Dataframe
+        Ag4->>Ag4: Synthesize Markdown Answer & Recommend Viz
+        Ag4-->>User: Final Answer, Evidence Panel & Chart
+    end
+```
+
+### Agent Detailed Breakdown
+
+#### 🔍 Agent 1: Semantic Grounding Agent (`schema_agent.py`)
+- Maps natural language phrases to governed entities, dimensions, and measures in `catalog.yaml`.
+- Uses a **hybrid dense-lexical vector matching engine**:
+  - Dense embedding similarity via GCP Vertex / LiteLLM embeddings.
+  - Fallback TF-IDF word + character 3-gram vector similarity (`defaultdict(float)` weighted cosine similarity).
+- Evaluates ambiguity via `AmbiguityModel`. If terms are ambiguous, requests explicit user clarification.
+
+#### ⚙️ Agent 2: Governed SQL Agent (`sql_agent.py` & `query_planner.py`)
+- Converts `GroundedIntent` into a structured physical `QueryPlan`.
+- **Fanout & Grain Protection**: Detects grain mismatches across 1:N or N:M joins. If fanout risk is detected, automatically compiles a **CTE subquery pre-aggregated SQL** statement to prevent row multiplication before joining.
+
+#### 🛡️ Agent 3: Execution & Safety Agent (`exec_agent.py`)
+- Enforces read-only safety via `SqlSafetyValidator` (blocks `INSERT`, `UPDATE`, `DROP`, `DELETE`, and direct `nexora_raw` access).
+- Supports dual execution backends:
+  - **Live BigQuery**: Authenticated cloud execution with dry-run byte cost estimation.
+  - **Local SQLite Engine (`local_engine.py`)**: 100% offline in-memory execution using loaded CSV source snapshots.
+
+#### 📊 Agent 4: Answer Synthesis & Viz Router (`answer_agent.py` & `viz_router.py`)
+- Synthesizes clear markdown summary answers with executive insights.
+- Evaluates dataframe shape, data types, and cardinality to select optimal Plotly visualizations (Bar charts, Line trends, Scatter plots, Donut charts, Metrics cards).
+- Provides complete evidence panels and rejection explanations when queries cannot be answered safely.
+
+---
+
+## 🛡️ Enterprise Data Quality & Security Guardrails
+
+### 1. 13 Enterprise Quality Gates (`gates_source.py`)
+Every batch extraction must pass 13 automated quality checks before committing watermarks:
+1. **Connectivity**: Source database connection health.
+2. **Schema Discovery**: Verification of expected tables and columns.
+3. **Permission Audit**: Read access privileges.
+4. **Extraction Boundary**: High-watermark lower/upper timestamp boundary sanity checks.
+5. **Extraction Completeness**: Row count extraction verification.
+6. **Type Coercion**: Data type conversion validation.
+7. **PK Uniqueness**: Zero primary key duplicate tolerance.
+8. **Null Constraint**: Non-null checks on critical keys.
+9. **Value Range**: Numeric & date sanity range checks.
+10. **Standardized Transformation**: Snake_case & metadata header injection check.
+11. **Warehouse Commit**: Successful BigQuery transaction validation.
+12. **Source-Target Reconciliation**: Source vs. target row count & aggregate sum validation.
+13. **Freshness SLA**: Data freshness threshold verification.
+
+### 2. PII Governance & Data Masking (`pii.py`)
+- Classifies PII columns (`email`, `phone`, `ssn`, `first_name`, `last_name`, `address`).
+- Integrates with GCP Cloud DLP (`inspect_content_pii`) for unstructured text scanning.
+- Applies BigQuery column policy tags via DDL (`ALTER TABLE ... SET OPTIONS (policy_tags=[...])`).
+- Automatically masks sensitive DataFrames (`mask_dataframe_pii`) before returning data to UI or exports.
+
+---
+
+## 🚀 Quickstart Guide
+
+### 1. Requirements & Installation
 
 ```bash
+# Clone Repository
+git clone https://github.com/Dakshin10/polyglot-warehouse-agent.git
+cd polyglot-warehouse-agent
+
+# Install dependencies in editable mode
 pip install -e ".[dev]"
 ```
 
-### 2. Configuration & Validation
+### 2. Configuration Setup
+
+Copy `.env.example` to `.env` and configure credentials:
 
 ```bash
-# Validate settings and configuration without leaking credentials
+cp .env.example .env
+```
+
+Validate project setup and environment configuration:
+
+```bash
 python -m pwa.cli config validate
 ```
 
-### 3. Operational Source Operations
+---
+
+## 💻 Command Line Interface (CLI) Reference
+
+The `pwa` CLI exposes complete management commands across all platform capabilities:
 
 ```bash
-# List all registered operational sources
-python -m pwa.cli source list
+# =====================================================================
+# 1. SOURCE OPERATIONS
+# =====================================================================
+python -m pwa.cli source list             # List registered sources
+python -m pwa.cli source inspect d1       # Inspect source connection & config
+python -m pwa.cli source discover alloydb # Discover tables & schema
+python -m pwa.cli source test aiven       # Test source connectivity
 
-# Inspect source configuration & local database connectivity
-python -m pwa.cli source inspect d1
-python -m pwa.cli source inspect alloydb
-python -m pwa.cli source inspect aiven
+# =====================================================================
+# 2. INGESTION & QUALITY GATES
+# =====================================================================
+python -m pwa.cli ingest run d1           # Ingest specific source into BigQuery
+python -m pwa.cli ingest run --all        # Ingest all sources
+python -m pwa.cli ingest status           # Inspect control plane run status
+python -m pwa.cli quality run d1          # Run 13 quality gates
+python -m pwa.cli warehouse validate      # Validate BigQuery lakehouse tables
 
-# Discover schemas and row counts in source databases
-python -m pwa.cli source discover d1
-python -m pwa.cli source discover alloydb
-python -m pwa.cli source discover aiven
+# =====================================================================
+# 3. ENTERPRISE SEMANTIC LAYER
+# =====================================================================
+python -m pwa.cli semantic validate       # Validate catalog YAML & formula integrity
+python -m pwa.cli semantic list           # List entities & physical tables
+python -m pwa.cli semantic metrics        # Inspect metrics & NULLIF formulas
+python -m pwa.cli semantic relationships  # Display governed join graph
+python -m pwa.cli semantic lineage revenue# Trace metric lineage back to source
 
-# Test connectivity to operational sources
-python -m pwa.cli source test d1
-```
-
-### 4. Ingestion & Quality Operations
-
-```bash
-# Ingest single source into BigQuery RAW/STAGING/CURATED
-python -m pwa.cli ingest run d1
-
-# Ingest all operational sources
-python -m pwa.cli ingest run --all
-
-# Check control plane run status
-python -m pwa.cli ingest status
-
-# Run 13 quality gates for a source
-python -m pwa.cli quality run d1
-
-# Validate BigQuery warehouse pipeline
-python -m pwa.cli warehouse validate
-
-# Audit control plane logs
-python -m pwa.cli audit --days 7
-```
-
-### 5. Enterprise Semantic & Analytics CLI (Phase 2A)
-
-```bash
-# Validate semantic catalog schema and division-by-zero integrity
-python -m pwa.cli semantic validate
-
-# List all registered enterprise semantic entities & physical tables
-python -m pwa.cli semantic list
-
-# Inspect metrics catalog and division-by-zero NULLIF formulas
-python -m pwa.cli semantic metrics
-
-# Display governed join graph relationships
-python -m pwa.cli semantic relationships
-
-# Inspect detailed metadata, primary keys, and grain of a specific entity
-python -m pwa.cli semantic inspect fact_sales_order
-
-# Trace lineage from metric -> curated -> staging -> raw -> source
-python -m pwa.cli semantic lineage revenue
-```
-
-### 6. Multi-Agent Enterprise Analytics CLI (Phase 2B)
-
-```bash
-# Ask natural language questions via multi-agent analytical pipeline
+# =====================================================================
+# 4. MULTI-AGENT AI ANALYTICS
+# =====================================================================
 python -m pwa.cli ask "Show monthly revenue by category"
+python -m pwa.cli query plan "Show top 5 customers by sales"
+python -m pwa.cli query explain "Show total expenditure by vendor"
 
-# Generate semantic query plan for a question
-python -m pwa.cli query plan "Show revenue by product category"
-
-# Produce full query explanation (intent, entities, dimensions, metrics, SQL, cost, validation status)
-python -m pwa.cli query explain "Show revenue by category"
-
-# Validate query end-to-end without full execution
-python -m pwa.cli query validate "Show monthly revenue"
-```
-
-### 7. Advanced Enterprise Analytics CLI (Phase 2C)
-
-```bash
-# Display multi-step analytical workflow breakdown and cost guardrails
-python -m pwa.cli analyze explain "Why did revenue change?"
-
-# Execute multi-step diagnostic, period comparison, or contribution workflow
+# =====================================================================
+# 5. ADVANCED ANALYTICS & DIAGNOSTICS (Phase 2C)
+# =====================================================================
 python -m pwa.cli ask "Show revenue growth year over year"
 python -m pwa.cli ask "Which categories contributed most to revenue growth?"
 python -m pwa.cli ask "Show customer retention by cohort"
@@ -276,45 +338,85 @@ python -m pwa.cli ask "Find unusual revenue movements"
 
 ---
 
-## 🧪 Testing & Local Development
+## 🧪 Comprehensive Offline Testing
 
-The test suite runs 100% offline without requiring active GCP cloud credentials by utilizing the mock adapter mode in `BigQueryWriter` and local SQLite representations for operational databases.
+The test suite runs **100% offline** without needing GCP cloud credentials by using mock BigQuery adapters and local SQLite in-memory databases.
 
 ```bash
-# Run complete test suite (185+ tests passing)
+# Run pytest test suite (419 tests passing)
 python -m pytest
 ```
 
-Key integration tests include:
-- Watermark non-advancement on extraction failure
-- Watermark non-advancement on quality gate failure
-- Watermark non-advancement on warehouse commit failure
-- Payload hash determinism & change detection
-- Ingestion idempotency across repeated runs
-- Schema drift policy enforcement (blocking incompatible changes)
-- Source-target row count reconciliation mismatch detection
-- Security audit ensuring secrets never leak to logs
+```
+================================ test session summary ================================
+collected 432 items / 9 deselected / 1 skipped / 423 selected
+
+tests\integration\test_cloud_integration.py sss                                [  0%]
+tests\test_alerting.py .......                                                 [  2%]
+tests\test_ast_sql_validation.py ........................                      [  8%]
+tests\test_audit_remediation.py ..................                             [ 12%]
+tests\test_auth.py ..........                                                  [ 14%]
+tests\test_connector_coverage.py ............................................. [ 37%]
+tests\test_embedding_production.py .........                                   [ 41%]
+tests\test_fanout_correctness.py ...                                           [ 43%]
+tests\test_guardrails.py .....                                                 [ 45%]
+tests\test_phase2a_semantic.py ..........                                      [ 58%]
+tests\test_phase2b_multi_agent.py ............                                 [ 60%]
+tests\test_phase2c_advanced_analytics.py ............                          [ 63%]
+tests\test_viz_recommendation.py .....................................         [ 94%]
+tests\test_viz_router.py ...................                                   [ 99%]
+tests\test_zero_overlap_matching.py ...                                        [100%]
+
+==================== 419 passed, 5 skipped, 9 deselected in 72.79s ====================
+```
 
 ---
 
-## 🔒 Security & Provenance
+## 📁 Repository Directory Structure
 
-- **Secret Redaction**: Passwords, API keys, and connection strings are masked in logs and CLI outputs.
-- **Kaggle Source Provenance**: Kaggle source datasets (AdventureWorks 2022, Olist E-Commerce, Olist Marketing Funnel) preserve full origin metadata in `docs/data/source-provenance.md`.
-
----
-
-## 📚 Documentation Directory
-
-- [Database Allocation Matrix](docs/data/database-allocation.md) — Table allocation, primary keys, FKs, and synthetic flags
-- [Operational Relationship Map](docs/data/relationship-map.md) — ERD diagrams and cross-database decoupling standards
-- [Source Provenance Standard](docs/data/source-provenance.md) — Provenance tracking standard
-- [Data Profiling Report](docs/data/data-profiling.md) — Column null rates and distinct counts
-- [Database Setup & Credential Guide](docs/data/database-setup.md) — Connection configuration and environment variables
-- [BigQuery Warehouse Guide](docs/bigquery.md) — Warehouse layout and security controls
+```
+polyglot-warehouse-agent/
+├── catalog_drafts/             # Auto-generated draft catalog YAML scaffolds
+├── docs/                       # Architecture, Database Allocations & ERD Docs
+│   ├── bigquery.md
+│   └── data/
+│       ├── database-allocation.md
+│       ├── data-profiling.md
+│       ├── database-setup.md
+│       ├── relationship-map.md
+│       └── source-provenance.md
+├── src/
+│   └── pwa/
+│       ├── agent/              # Multi-Agent Orchestration & Pipeline
+│       │   ├── pipeline/       # Agent 1 (Schema), Agent 2 (SQL), Agent 3 (Exec), Agent 4 (Answer)
+│       │   ├── guardrails.py   # Cost & Safety Guardrails
+│       │   ├── models.py       # LLM & Embedding Integrations
+│       │   ├── router.py       # Intent Router
+│       │   └── tools.py        # BQ Tools & Local SQLite Interop
+│       ├── analytics/          # Phase 2C Advanced Analytics & Diagnostics
+│       │   ├── anomaly.py      # Anomaly Detection
+│       │   ├── insight.py      # Automated Insight Generation
+│       │   ├── operators.py    # Period Comparisons & Cohort Operators
+│       │   └── templates.py    # Analytical Templates
+│       ├── control_plane/      # Metadata Control Plane & Watermark Managers
+│       ├── governance/         # PII Classification & Data Masking
+│       ├── ingestion/          # Source Extraction & Connector Engines (D1, AlloyDB, Aiven)
+│       ├── observability/      # Alerting, Structured Logging & Tracing
+│       ├── quality/            # 13 Quality Gates & Source-Target Reconciliation
+│       ├── semantic/           # Catalog Loader, Query Planner, Governed SQL Generator
+│       ├── ui/                 # Streamlit UI Components, Viz Router & PDF Export
+│       ├── warehouse/          # BigQuery Writer & Local SQLite Engine
+│       ├── cli.py              # Central PWA Command Line Interface
+│       ├── metrics.py          # Telemetry & Observability Tracker
+│       ├── settings.py         # PWA Platform Configuration
+│       └── smart_cache.py      # Smart Cache & SyncStateStore
+├── tests/                      # 419 Unit & Integration Tests
+├── pyproject.toml              # Build System & Project Configuration
+└── README.md                   # Platform Architecture & Developer Guide
+```
 
 ---
 
 ## 📜 License
 
-Distributed under the [MIT License](LICENSE).
+Distributed under the **[MIT License](LICENSE)**. Designed for enterprise data platform automation and heterogeneous AI analytics.

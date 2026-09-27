@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+import os
+from typing import Any, Optional
 
 
 def get_policy_tag_path(field_name: str) -> str:
@@ -144,10 +145,6 @@ def import_math_isnan(val: float) -> bool:
     import math
 
     return math.isnan(val)
-
-
-import os
-from typing import Any, Dict, List, Optional
 
 
 def inspect_content_pii(text: str) -> list[dict[str, Any]]:
